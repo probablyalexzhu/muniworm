@@ -79,12 +79,13 @@
   .chip .nm{ font-weight:700; font-size:clamp(9.5px,1.1vw,13px); color:var(--ink);
     letter-spacing:.01em; white-space:nowrap; text-shadow:0 1px 2px rgba(255,255,255,.5); }
   .chip.on{ opacity:1 }
+  .chip.press .badge{ animation:winderpress .26s ease; }   /* same depress flash as the arrow keys, on click / tap / J K L M N T */
 
   /* ---- wind / unwind: arrow-key indicator (bottom-left), styled to match the route-list badges ---- */
   .winder{ position:absolute; left:clamp(8px,1.8%,22px); bottom:clamp(10px,3vh,28px); z-index:6;
     display:flex; align-items:center; gap:clamp(6px,.8vw,10px);
     opacity:0; transform:translateY(6px); transition:opacity .6s ease, transform .6s ease; pointer-events:none; }
-  body.playing .winder{ opacity:1; transform:none; pointer-events:auto; }
+  body.playing.winder-ready .winder{ opacity:1; transform:none; pointer-events:auto; }   /* hidden through the first morph (unobstructed logo reveal); shown once it completes or the user presses an arrow */
   .winder-key{ width:clamp(20px,2.4vw,30px); aspect-ratio:1; border-radius:50%; border:0; padding:0; cursor:pointer;
     display:grid; place-items:center; -webkit-tap-highlight-color:transparent;
     background:#BB6F3C; color:#fff;
@@ -98,11 +99,11 @@
   /* ---- intro: reader (left) + Clipper card (right), tightened toward center for less drag travel ---- */
   .reader{ position:absolute; top:50%; left:38%; transform:translate(-50%,-50%); z-index:6;
     width:min(33vmin,330px); height:min(33vmin,330px); border-radius:50%;
-    background:#0c4a82 url("clipper-reader.png") center/cover no-repeat;
+    background:url("clipper-reader.png") center/cover no-repeat;
     box-shadow:0 10px 30px rgba(0,0,0,.5), inset 0 0 0 2px rgba(0,0,0,.18);
     transition:opacity .55s ease, box-shadow .15s ease; }
-  .reader.armed{ box-shadow:0 0 0 6px rgba(95,225,105,.6), 0 10px 30px rgba(0,0,0,.5); }
-  .reader.tap{ box-shadow:0 0 0 10px rgba(95,225,105,.8), 0 0 54px 16px rgba(95,225,105,.55); }
+  .reader.armed{ box-shadow:0 0 0 6px rgba(167,194,67,.7), 0 10px 30px rgba(0,0,0,.5); }
+  .reader.tap{ box-shadow:0 0 0 10px rgba(167,194,67,.9), 0 0 54px 16px rgba(167,194,67,.55); }
   .ccard{ position:absolute; top:50%; left:62%; transform:translate(-50%,-50%); z-index:7;
     aspect-ratio:200/310; height:min(36vmin,293px); border-radius:11px; cursor:grab; touch-action:none; will-change:transform;
     background:#11568f url("clipper-card.png") center/cover no-repeat;
@@ -140,9 +141,10 @@
 
   /* ============ line explorer: focus a single line, dim the rest, show its story ============ */
   /* lines/legend only respond on the finished map */
-  #lines path{ transition:opacity .32s ease, filter .32s ease; }
-  #lines path.lnpath{ stroke:transparent; stroke-width:12px; }              /* invisible padding -> a more forgiving hover/click target than the thin ribbon */
-  body.map-ready #lines path.lnpath{ pointer-events:all; cursor:pointer; }   /* hit the fill OR the padded transparent band */
+  #lines path{ transition:opacity .32s ease, filter .32s ease; pointer-events:none; }   /* visible lines are display-only; hit-testing lives on #hit */
+  /* transparent hit layer, pinned on top: wide stroke = forgiving target; never reordered, so hover is stable over overlaps */
+  #hit path.lnhit{ fill:transparent; stroke:transparent; stroke-width:17px; stroke-linejoin:round; pointer-events:none; }
+  body.map-ready #hit path.lnhit{ pointer-events:all; cursor:pointer; }    /* hit the ribbon fill OR the padded band */
   #lines path.dim{ opacity:.1; }                                   /* the other routes recede */
   #lines path.hot{ filter:brightness(1.04) drop-shadow(0 0 5px rgba(0,0,0,.28)); }
   #land.show.dim{ opacity:.2; transition:opacity .3s ease; } #caps.show.dim{ opacity:.22; transition:opacity .3s ease; }   /* darken landform + end caps so the chosen line pops (snappy dim-in; gentle fade back) */

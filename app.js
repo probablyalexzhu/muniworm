@@ -162,6 +162,14 @@ const paths=MORPH.map(()=>document.createElementNS('http://www.w3.org/2000/svg',
 const Z_ORDER=['T','N','L','M','K','J'];                  // bottom -> top
 Z_ORDER.forEach(k=>linesG.appendChild(paths[TARGETS.indexOf(k)]));
 
+// invisible hit layer, pinned on top and NEVER reordered. Pointer events live here, so re-stacking the
+// visible lines (for z) under the cursor can't desync hover/leave over overlapping ribbons. Geometry tracks
+// the lines (kept in sync in render); the wide transparent stroke gives a forgiving target.
+const NS_SVG='http://www.w3.org/2000/svg';
+const hitG=document.createElementNS(NS_SVG,'g'); hitG.setAttribute('id','hit');
+const hitPaths=TARGETS.map(()=>{ const h=document.createElementNS(NS_SVG,'path'); h.classList.add('lnhit'); hitG.appendChild(h); return h; });
+document.getElementById('svg').appendChild(hitG);   // last child of the SVG -> above lines, caps, worm
+
 /* stations */
 const NS='http://www.w3.org/2000/svg', stationsG=document.getElementById('stations');
 const landG=document.getElementById('land');
@@ -206,7 +214,7 @@ function render(T){
       const lt=ease(Math.min(1,Math.max(0, mp*(1+LAG) - lp[j]*LAG)));   // arc-phased: head first
       pts[j]=[S[j][0]+(D[j][0]-S[j][0])*lt, S[j][1]+(D[j][1]-S[j][1])*lt];
     }
-    paths[i].setAttribute('d', toPath(pts));
+    const dstr=toPath(pts); paths[i].setAttribute('d', dstr); hitPaths[i].setAttribute('d', dstr);   // hit layer mirrors the line geometry
     paths[i].setAttribute('fill', mix(BASE[i],DST[i],ease(cp)));
   }
   // hard hand-off: T=0 -> crisp worm only; the instant morph begins -> glowing lines only.
@@ -216,7 +224,17 @@ function render(T){
   linesG.style.opacity = lit?1:0;
   stationsG.style.opacity = Math.max(0,(T-0.78)/0.22).toFixed(2);
 
-  legendChips.forEach((r)=>r.el.classList.toggle('on', T > (r.rank+0.85)*STEP));
+  legendChips.forEach((r)=>{
+    r.el.classList.toggle('on', T > (r.rank+0.85)*STEP);  // chip lights only once the line has fully landed
+    // tone fires just inside each line's window, as it BEGINS peeling. The 0.15 offset keeps the
+    // threshold off the arrow-key stop boundaries (which land on exact sixths) — otherwise a single
+    // step would straddle two thresholds (double note) and resting on a boundary would let a tiny
+    // reversal re-fire it (wind+unwind both). One stop step now crosses exactly one threshold.
+    const th=(r.rank+0.15)*STEP;
+    if(T>th && !(prevRenderT>th)) sndLine(r.rank, 1);     // crossed forward: line starts peeling out -> rising note
+    else if(prevRenderT>th && !(T>th)) sndLine(r.rank, -1); // crossed backward: line folds back in -> falling note
+  });
+  prevRenderT=T;
   document.body.classList.toggle('map-ready', T>=1);   // only the finished map is interactive (lines selectable)
   if(T<1) clearSelection();                            // stepping/folding away from the map drops any line selection
 }
@@ -232,6 +250,7 @@ const legendEl=document.getElementById('legend'), legendChips=[];
    Master position POS spans two phases: 0->1 draws the worm, 1->2 morphs worm -> map (morph T = POS-1).
    Both phases are position-driven, so the whole thing scrubs / winds / unwinds via the arrow-key stops below. */
 let POS=0, raf=null, aim=1, wormMode=null;   // aim=in-flight target (for mid-flight stepping); wormMode 'draw'|'full' avoids per-frame restyle
+let prevRenderT=0;                           // last morph T seen by render() — lets us catch each line's threshold crossing for its tone
 function renderMaster(pos){
   if(pos < 1){                                          // DRAW phase: the worm traces itself; lines + stations hidden
     if(wormMode!=='draw'){ armWorm(); wormMode='draw'; }
@@ -260,6 +279,23 @@ const sndTap  =()=>{ blip(2050,{type:'square',dur:.05,vol:.13}); blip(2700,{t:.0
 const sndDing =()=>{ blip(760,{type:'sine',dur:.75,vol:.3}); blip(1520,{type:'sine',dur:.5,vol:.08}); };               // stop-request bong
 const sndChime=()=>{ [988,1319,1568].forEach((f,i)=>blip(f,{t:i*.15,type:'sine',dur:.5,vol:.16})); };                  // doors / arrival
 const sndTick =()=>blip(820+Math.random()*620,{type:'square',dur:.016,vol:.045});                                       // flap clatter
+/* short decaying noise burst through a bandpass -> a dry, plasticky "tick/tap" (card handling) */
+function clack(o){ o=o||{}; const c=audio(); if(!c) return; const t=c.currentTime+(o.t||0), dur=o.dur||.06;
+  const len=Math.max(1,Math.ceil(c.sampleRate*dur)), buf=c.createBuffer(1,len,c.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len, o.decay||2.4);                  // exponential-ish decay envelope
+  const src=c.createBufferSource(); src.buffer=buf;
+  const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=o.freq||1100; bp.Q.value=o.q||0.7;
+  const g=c.createGain(); g.gain.value=o.vol==null?.16:o.vol;
+  src.connect(bp); bp.connect(g); g.connect(c.destination); src.start(t); src.stop(t+dur+.02); }
+const sndPickup =()=>{ clack({freq:1650,dur:.05,vol:.13,decay:3.2}); blip(520,{slide:700,type:'triangle',dur:.05,vol:.05}); };  // light lift off the surface (rising)
+const sndPutdown=()=>{ clack({freq:780,dur:.075,vol:.17,decay:2.0}); blip(320,{slide:210,type:'triangle',dur:.07,vol:.06}); };   // set back down — a soft, lower "tup" (falling)
+/* per-route tone: each line owns one note of a rising major-pentatonic scale, in route order J K L M N T.
+   It sounds the instant the line peels out of the worm and its chip lights. Wind forward and the scale
+   climbs J->T; unwind and the same notes fire in reverse, so the scale falls back down. */
+const LINE_SCALE=[523.25,587.33,659.25,783.99,987.77,1046.50];     // C5 D5 E5 G5 B5 C6 — N (Judah) is the major 7th, leaning up into the C6 octave at the top
+function sndLine(rank,dir){ const f=LINE_SCALE[rank]; if(f==null) return;
+  if(dir>=0) blip(f,{type:'sine',dur:.42,vol:.17});                          // appear: a clean bell at the line's pitch
+  else       blip(f,{type:'triangle',dur:.30,vol:.10,slide:f*0.82}); }       // disappear: softer, bent downward as it folds away
 
 /* ---------- progressive reveal: tap in -> fullscreen morph -> click to tap off ---------- */
 const caseEl=document.getElementById('case'), screenEl=document.getElementById('stage');
@@ -319,9 +355,10 @@ function renderDraw(d){                                 // scrub the trace to dr
 const DRAW_MS=2700, MORPH_MS=9000;                      // auto-play pacing: draw ~2.7s, then morph ~9s
 function startPlay(){ POS=0; renderMaster(0); revealCase();          // blank screen, zoom in
   setTimeout(()=>animateTo(1, DRAW_MS, ()=>{                          // the worm draws itself...
-    setTimeout(()=>animateTo(2, MORPH_MS, ()=>{ sndChime(); landG.classList.add('show'); capsG.classList.add('show'); legendEl.classList.add('show'); }), 650);   // ...beat, then morph into the map
+    setTimeout(()=>animateTo(2, MORPH_MS, ()=>{ landG.classList.add('show'); capsG.classList.add('show'); legendEl.classList.add('show'); showWinder(); }), 650);   // ...beat, then morph into the map (the rising scale's top note is the finish — no extra chime); now reveal the arrow buttons
   }), 450); }   // let the zoom settle, then the pen starts
-function resetCard(){ card.style.transition=''; card.style.transform='translate(-50%,-50%)'; card.style.transformOrigin=''; }
+let homeOff={x:0,y:0};   // the card's persistent offset from its CSS home — it stays wherever you drop it
+function resetCard(){ homeOff={x:0,y:0}; card.style.transition=''; card.style.transform='translate(-50%,-50%)'; card.style.transformOrigin=''; }
 
 /* the card pivots around the grab point (held between two fingers): velocity drags the body so it
    trails, swings and — with fast circular motion — spins right around the cursor. */
@@ -332,28 +369,41 @@ function phys(){
   const dt=1/60;
   if(drag.held){                                            // following the cursor: motion drags the body around
     const vx=drag.px-drag.lpx, vy=drag.py-drag.lpy; drag.lpx=drag.px; drag.lpy=drag.py;
+    drag.vx=vx; drag.vy=vy;                                 // remember cursor velocity for the release flick
     const speed=Math.hypot(vx,vy);
     let aa=-DAMP*drag.omega;
     if(speed>0.4){ const target=Math.atan2(-vy,-vx); let diff=target-drag.theta; diff=Math.atan2(Math.sin(diff),Math.cos(diff));
       aa += diff*Math.min(speed,90)*PULL; }
     let dth=drag.theta-drag.restAng; dth=Math.atan2(Math.sin(dth),Math.cos(dth)); aa += -REST*dth;
     drag.omega += aa*dt; drag.theta += drag.omega*dt;
-    drag.dx=drag.px-drag.sx; drag.dy=drag.py-drag.sy;
-  } else {                                                   // released: momentum carries it (flick), then it settles + drifts home
+    drag.dx=drag.baseDx+(drag.px-drag.sx); drag.dy=drag.baseDy+(drag.py-drag.sy);   // absolute offset from home
+  } else {                                                   // released: the flick carries it, friction stops it — it stays where it lands
     let dth=drag.theta-drag.restAng; dth=Math.atan2(Math.sin(dth),Math.cos(dth));
     drag.omega += (-DAMP*drag.omega - REST*dth)*dt; drag.theta += drag.omega*dt;
-    drag.dx*=0.86; drag.dy*=0.86;
-    if(Math.abs(drag.omega)<0.04 && Math.abs(dth)<0.01 && Math.hypot(drag.dx,drag.dy)<0.6){ resetCard(); drag=null; physReq=null; return; }
+    drag.dx+=drag.vx; drag.dy+=drag.vy; drag.vx*=0.9; drag.vy*=0.9;
+    if(Math.abs(drag.omega)<0.04 && Math.abs(dth)<0.01 && Math.hypot(drag.vx,drag.vy)<0.25){
+      clampOff(drag); homeOff={x:drag.dx,y:drag.dy};        // remember the new resting spot
+      card.style.transform=`translate(-50%,-50%) translate(${drag.dx}px,${drag.dy}px) rotate(0deg)`;
+      drag=null; physReq=null; return; }
   }
+  clampOff(drag);                                           // keep the whole card on the page
+  homeOff={x:drag.dx,y:drag.dy};                            // track the live offset so a re-grab mid-settle picks up from here (no snap)
   const deg=(drag.theta-drag.restAng)*180/Math.PI;
   card.style.transform=`translate(-50%,-50%) translate(${drag.dx}px,${drag.dy}px) rotate(${deg}deg)`;
   physReq=requestAnimationFrame(phys);
 }
-card.addEventListener('pointerdown',e=>{ e.preventDefault(); audio();
+function clampOff(d){                                        // clamp the offset so the card center stays within the viewport (kills velocity at the edge)
+  if(d.dx<d.minDx){ d.dx=d.minDx; if(d.vx<0) d.vx=0; } else if(d.dx>d.maxDx){ d.dx=d.maxDx; if(d.vx>0) d.vx=0; }
+  if(d.dy<d.minDy){ d.dy=d.minDy; if(d.vy<0) d.vy=0; } else if(d.dy>d.maxDy){ d.dy=d.maxDy; if(d.vy>0) d.vy=0; }
+}
+card.addEventListener('pointerdown',e=>{ e.preventDefault(); audio(); sndPickup();
   const r=card.getBoundingClientRect(), gx=e.clientX-r.left, gy=e.clientY-r.top;
   const restAng=Math.atan2(r.height/2-gy, r.width/2-gx);        // rod from grab point to card centre
-  drag={ held:true, sx:e.clientX, sy:e.clientY, px:e.clientX, py:e.clientY, lpx:e.clientX, lpy:e.clientY, dx:0, dy:0, theta:restAng, omega:0, restAng,
-         restCx:r.left+r.width/2, restCy:r.top+r.height/2 };   // card's resting centre, for the drop-onto-reader
+  const hw=r.width/2, hh=r.height/2, M=4, homeCx=r.left+hw-homeOff.x, homeCy=r.top+hh-homeOff.y;   // home center = current center minus the saved offset
+  drag={ held:true, sx:e.clientX, sy:e.clientY, px:e.clientX, py:e.clientY, lpx:e.clientX, lpy:e.clientY, vx:0, vy:0,
+         baseDx:homeOff.x, baseDy:homeOff.y, dx:homeOff.x, dy:homeOff.y, theta:restAng, omega:0, restAng,
+         restCx:r.left+hw, restCy:r.top+hh, homeCx, homeCy,    // resting centre + home centre, for the drop-onto-reader
+         minDx:hw+M-homeCx, maxDx:innerWidth-hw-M-homeCx, minDy:hh+M-homeCy, maxDy:innerHeight-hh-M-homeCy };
   card.style.transformOrigin=`${gx}px ${gy}px`; card.style.transition='none'; card.classList.add('dragging');
   card.setPointerCapture(e.pointerId); if(!physReq) physReq=requestAnimationFrame(phys); });
 card.addEventListener('pointermove',e=>{ if(!drag||!drag.held) return; drag.px=e.clientX; drag.py=e.clientY;
@@ -364,14 +414,14 @@ card.addEventListener('pointerup',e=>{ if(!drag) return;
   if(hit){
     // land somewhere ON the reader, not dead-centre — a little human jitter in position + tilt
     const jx=(Math.random()*2-1)*c.rad*0.26, jy=(Math.random()*2-1)*c.rad*0.26, jr=(Math.random()*2-1)*7;
-    const tx=c.x+jx-drag.restCx, ty=c.y+jy-drag.restCy; drag=null;   // stop physics
+    const tx=c.x+jx-drag.homeCx, ty=c.y+jy-drag.homeCy; drag=null;   // offset from home so it lands centred on the reader (works wherever the card rested)
     if(physReq){cancelAnimationFrame(physReq); physReq=null;}
     card.style.transition='transform .24s cubic-bezier(.3,.85,.3,1)';   // "fall" flat onto the reader (glide + settle slightly askew)
     card.style.transform=`translate(-50%,-50%) translate(${tx}px,${ty}px) rotate(${jr.toFixed(2)}deg)`;
     tapAccept();
     setTimeout(startPlay, 1000);                                // hold a beat on the reader, then the worm appears + morph
   }
-  else { drag.held=false; }                                    // let the flick carry, then settle home via physics
+  else { drag.held=false; sndPutdown(); }                      // dropped off the reader: soft put-down, then the flick carries home via physics
 });
 card.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); tapAccept(); setTimeout(startPlay,900); } });  // a11y fallback
 
@@ -379,15 +429,19 @@ card.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.prevent
 /* stops in master-POS space: 1 = drawn worm · then one stop per line peeling off · 2 = finished map */
 const STOPS=[1].concat([0,1,2,3,4,5].map(r=>1+Math.min(1, r*STEP+SPAN)));
 let lastStep=0;
-function goTo(target,dur,tick){ aim=target; audio(); if(tick) sndTick();
+function goTo(target,dur,tick){ aim=target; audio();   // no step "tick" — each step now rings its line's tone instead
   if(target>0.02) revealCase(); const done=target>=2;
   landG.classList.toggle('show', done); capsG.classList.toggle('show', done); legendEl.classList.toggle('show', done);
-  animateTo(target, dur, done?sndChime:null); }
+  animateTo(target, dur, null); }                 // no arrival chime — the per-line rising scale carries the finish
 function stepStage(dir,fast){
   // slideshow chain: intro (caseShown=false) <-> draw the worm (POS 0->1) <-> morph stops <-> finished map (POS 2)
   if(!caseShown){ if(dir>0) goTo(1, 1500, true); return; }    // from the intro: right zooms in AND draws the worm; left does nothing (already home)
   const base = raf!=null ? aim : POS;                         // mid-flight: step off the in-flight target so mashing/holding keeps advancing
-  if(dir<0 && base<=1+1e-3){ exitToIntro(); return; }         // at the worm (POS<=1): left un-draws the worm and rewinds to the intro
+  // Fold back to the intro only once we've ACTUALLY reached the worm — gate on real POS, not the in-flight aim.
+  // While holding the key, aim races ahead of POS; exiting on aim would hand a half-finished morph to the slow
+  // 2400ms/unit intro tween, so the last few lines would crawl. Until POS arrives, keep stepping toward POS=1
+  // at the normal stepping speed (the clause below targets 1 when base<=1), so the morph reverses briskly.
+  if(dir<0 && aim<=1+1e-3 && POS<=1+1e-3){ exitToIntro(); return; }
   let target;
   if(dir>0){ target=STOPS.find(s=>s>base+1e-3); if(target==null) target=2; }
   else { const p=STOPS.filter(s=>s<base-1e-3); target=p.length?p[p.length-1]:1; }
@@ -395,26 +449,27 @@ function stepStage(dir,fast){
 /* wind/unwind indicator: clickable buttons mirroring the arrow keys, with a press-flash on key/click */
 const windPrev=document.getElementById('windPrev'), windNext=document.getElementById('windNext');
 function pressKey(el){ el.classList.remove('press'); void el.offsetWidth; el.classList.add('press'); }  // reflow retriggers the animation
+function showWinder(){ document.body.classList.add('winder-ready'); }   // reveal the arrow buttons (once the first morph finishes, or the moment the user reaches for the arrows)
 windPrev.addEventListener('animationend',()=>windPrev.classList.remove('press'));
 windNext.addEventListener('animationend',()=>windNext.classList.remove('press'));
 windPrev.addEventListener('click',()=>{ pressKey(windPrev); stepStage(-1,false); });
 windNext.addEventListener('click',()=>{ pressKey(windNext); stepStage(1,false); });
 window.addEventListener('keydown',e=>{
   const now=performance.now(), fast=e.repeat || (now-lastStep<260); lastStep=now;   // held key or rapid taps -> accelerate
-  if(e.key==='ArrowRight'){e.preventDefault();pressKey(windNext);stepStage(1,fast);}
-  else if(e.key==='ArrowLeft'){e.preventDefault();pressKey(windPrev);stepStage(-1,fast);}
+  if(e.key==='ArrowRight'){e.preventDefault();showWinder();pressKey(windNext);stepStage(1,fast);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();showWinder();pressKey(windPrev);stepStage(-1,fast);}
   else if(e.key==='Home'){e.preventDefault();goTo(1,700,false);}                    // jump to the worm
   else if(e.key==='End'){e.preventDefault();goTo(2,700,false);}                     // jump to the finished map
 });
 
 /* ---------- line explorer: hover / tap a line on the finished map for its story; the rest of the map dims away ---------- */
 const INFO={
-  J:{ year:1917, from:'Embarcadero', to:'Balboa Park', text:'One of Muni Metro’s original streetcar routes, the J Church has wound past Dolores Park and along the slopes of Noe Valley since 1917. Its street-running curves and steep grades make it one of the network’s most scenic — and most leisurely — rides.' },
-  K:{ year:1918, from:'Embarcadero', to:'Balboa Park', text:'Opened in 1918 to spur development of the Ingleside district, the K runs through the Twin Peaks Tunnel and out to Balboa Park, where it now through-routes with the T Third as a single cross-town service.' },
+  J:{ year:1917, from:'Embarcadero', to:'Balboa Park', text:'One of Muni Metro’s original streetcar routes, it is the only one that climbs Church Street and uses a serpentine alignment through Dolores Park to handle Church Street’s steep grade. A Redditor’s friend from Japan said "the stop on top of Dolores Park looked like a scene from a Studio Ghibli movie.' },
+  K:{ year:1918, from:'Embarcadero', to:'Balboa Park', text:'Opened in 1918 to spur development of the Ingleside district, the K runs through the Twin Peaks Tunnel and out to Balboa Park. It is one of the classic Muni lines that survived because it had infrastructure the city couldn’t easily replace with buses.' },
   L:{ year:1919, from:'Embarcadero', to:'SF Zoo', text:'Tracing Taraval Street clear across the Sunset to the SF Zoo and Ocean Beach, the L Taraval has linked downtown with the western edge of the city since 1919, much of it running down the middle of the street.' },
-  M:{ year:1925, from:'Embarcadero', to:'Balboa Park', text:'The M Ocean View opened in 1925 and today connects downtown with San Francisco State University and Stonestown, gliding along a dedicated median down the center of 19th Avenue.' },
-  N:{ year:1928, from:'Caltrain', to:'Ocean Beach', text:'It is the busiest line in the Muni Metro system, serving an average of 33,100 weekday passengers in June 2025. It was one of San Francisco’s streetcar lines, beginning operation in 1928, and was partially converted to modern light-rail operation with the opening of the Muni Metro system in 1980.' },
-  T:{ year:2007, from:'Sunnydale', to:'Chinatown', text:'The system’s newest line, the T Third opened in 2007 to serve the long-overlooked southeastern waterfront. In 2022 the Central Subway carried it underground beneath Market Street to a new terminus in Chinatown.' },
+  M:{ year:1925, from:'Embarcadero', to:'Balboa Park', text:'The M Ocean View opened in 1925 and runs from Embarcadero to Balboa Park, serving San Francisco State University and Stonestown along the way. It was one of the last of the classic lettered lines to be added before the network stabilized in the late 1920s.' },
+  N:{ year:1928, from:'Caltrain', to:'Ocean Beach', text:'Judah is the busiest line in the Muni Metro system, serving an average of 33,100 weekday passengers in June 2025. It was one of San Francisco’s streetcar lines, beginning operation in 1928, later becoming the first Muni Metro line to run in the Market Street Subway when the subway opened in 1980.' },
+  T:{ year:2007, from:'Chinatown', to:'Sunnydale', text:'The system’s newest line, the T Third opened in 2007 to serve the long-overlooked southeastern waterfront. In 2023, the Central Subway carried it underground beneath Market Street to a new terminus in Chinatown.' },
 };
 const panel=document.getElementById('lineinfo');
 const piBadge=panel.querySelector('.li-badge'), piName=panel.querySelector('.li-name'),
@@ -437,15 +492,17 @@ function paint(){ const k=eff();
   } else { panel.classList.remove('show'); document.body.classList.remove('line-selected'); } }
 function setHover(k){ if(!isReady()||hovered===k) return; hovered=k; paint(); }
 function dropHover(){ if(hovered===null) return; hovered=null; paint(); }                    // leaving a line / the route list drops the preview, falling back to the pinned line (if any)
-function togglePin(k){ if(!isReady()) return; pinned = pinned===k ? null : k; paint(); }      // type a letter or click a line/chip to lock it; same again releases it
+function togglePin(k){ if(!isReady()) return; sndLine(RANK[k], 1); const c=legendChips.find(c=>c.key===k); if(c) pressKey(c.el);   // depress-flash the chip, same as the arrow keys
+  pinned = pinned===k ? null : k; paint(); }   // type a letter or click a line/chip to lock it (and ring its note); same again releases it
 function clearSelection(){ if(pinned===null && hovered===null) return; pinned=null; hovered=null; paint(); }
-// hover previews, click/tap pins; the legend chip is a bigger, easier target than the thin ribbon
-paths.forEach((p,i)=>{ const k=TARGETS[i]; p.classList.add('lnpath');
-  p.addEventListener('pointerenter',()=>setHover(k)); p.addEventListener('pointerleave',dropHover); p.addEventListener('click',()=>togglePin(k)); });
-legendChips.forEach(c=>{ c.el.addEventListener('pointerenter',()=>setHover(c.key)); c.el.addEventListener('click',()=>togglePin(c.key)); });
+// hover previews, click/tap pins. Events live on the fixed hit layer (not the reordered visible lines), and the legend chip is a bigger, easier target than the thin ribbon
+hitPaths.forEach((h,i)=>{ const k=TARGETS[i];
+  h.addEventListener('pointerenter',()=>setHover(k)); h.addEventListener('pointerleave',dropHover); h.addEventListener('click',()=>togglePin(k)); });
+legendChips.forEach(c=>{ c.el.addEventListener('pointerenter',()=>setHover(c.key)); c.el.addEventListener('click',()=>togglePin(c.key));
+  c.el.addEventListener('animationend',()=>c.el.classList.remove('press')); });   // clear the depress-flash when it finishes (animation bubbles up from the badge)
 legendEl.addEventListener('pointerleave', dropHover);   // leave the route list -> drop the focus on the most-recently-hovered route
 // click empty map -> clear; the panel lives outside the screen so clicking it won't dismiss
-screenEl.addEventListener('click', e=>{ if(e.target.closest('.legend')||(e.target.classList&&e.target.classList.contains('lnpath'))) return; clearSelection(); });
+screenEl.addEventListener('click', e=>{ if(e.target.closest('.legend')||(e.target.classList&&e.target.classList.contains('lnhit'))) return; clearSelection(); });
 // keyboard: J K L M N T toggle that line's focus; Esc clears
 addEventListener('keydown', e=>{
   if(e.key==='Escape'){ clearSelection(); return; }
@@ -457,5 +514,5 @@ addEventListener('keydown', e=>{
 /* ---------- start: platform + Clipper only; the case appears on tap-in ---------- */
 const qs=new URLSearchParams(location.search);
 if(qs.has('t')){ const t=Math.max(0,Math.min(1,parseFloat(qs.get('t'))||0)); POS=1+t; aim=POS; revealCase(); renderMaster(POS);   // ?t= is morph progress (0=worm .. 1=map) -> POS 1..2
-  if(POS>=2){ landG.classList.add('show'); capsG.classList.add('show'); legendEl.classList.add('show'); } }
+  if(POS>=2){ landG.classList.add('show'); capsG.classList.add('show'); legendEl.classList.add('show'); showWinder(); } }   // deep-linked straight to the map -> no morph to protect, show the arrows
 else { POS=0; renderMaster(0); }   // intro: blank screen, worm armed to draw on first step
