@@ -225,6 +225,7 @@ function render(T){
   stationsG.style.opacity = Math.max(0,(T-0.78)/0.22).toFixed(2);
 
   legendChips.forEach((r)=>{
+    if(r.key==='WORM'){ r.el.classList.toggle('on', T>=1); return; }   // the worm isn't a morphing line — it just lights with the finished map
     r.el.classList.toggle('on', T > (r.rank+0.85)*STEP);  // chip lights only once the line has fully landed
     // tone fires just inside each line's window, as it BEGINS peeling. The 0.15 offset keeps the
     // threshold off the arrow-key stop boundaries (which land on exact sixths) — otherwise a single
@@ -239,24 +240,34 @@ function render(T){
   if(T<1) clearSelection();                            // stepping/folding away from the map drops any line selection
 }
 
+/* ---------- the worm: a 7th "line" in the list, but it tells the logo's own story instead of a route ---------- */
+const WORM_BLUE='#0C6CB5';                                  // SFMTA blue (matches muni-worm-icon.png)
+const WORM_TEXT='A staple of SF’s visual urban landscape and a testament to enduring design, the intertwined "M" and arrow, rendered in distinctive red orange, cleverly symbolize movement and interconnectedness. Many look at this mark as a symbolic reference to the streets, hills and valleys of San Francisco.';
+
 /* ---------- legend (route order) ---------- */
 const legendEl=document.getElementById('legend'), legendChips=[];
 ['J','K','L','M','N','T'].forEach((k,rank)=>{ const m=META[k]; const el=document.createElement('div');
   el.className='chip'; el.style.setProperty('--c',m.color); el.dataset.line=k;
   el.innerHTML=`<span class="badge">${k}</span><span class="nm">${m.name}</span>`;
   legendEl.appendChild(el); legendChips.push({el,rank,key:k}); });
+(function(){ const el=document.createElement('div');                       // the worm sits under T — same round button, the SFMTA icon (set as the badge background in CSS)
+  el.className='chip chip-worm'; el.style.setProperty('--c',WORM_BLUE); el.dataset.line='WORM';
+  el.innerHTML=`<span class="badge"></span><span class="nm">The Worm</span>`;
+  legendEl.appendChild(el); legendChips.push({el,rank:6,key:'WORM'}); })();
 
 /* ---------- timeline ----------
    Master position POS spans two phases: 0->1 draws the worm, 1->2 morphs worm -> map (morph T = POS-1).
    Both phases are position-driven, so the whole thing scrubs / winds / unwinds via the arrow-key stops below. */
 let POS=0, raf=null, aim=1, wormMode=null;   // aim=in-flight target (for mid-flight stepping); wormMode 'draw'|'full' avoids per-frame restyle
 let prevRenderT=0;                           // last morph T seen by render() — lets us catch each line's threshold crossing for its tone
+let prevDrawD=0;                             // last draw-fraction seen by renderMaster() — lets drawCues() catch glyph + ink-flood crossings
 function renderMaster(pos){
   if(pos < 1){                                          // DRAW phase: the worm traces itself; lines + stations hidden
     if(wormMode!=='draw'){ armWorm(); wormMode='draw'; }
     wormG.style.opacity=1; linesG.style.opacity=0; stationsG.style.opacity=0;
     legendChips.forEach(r=>r.el.classList.remove('on'));
     renderDraw(pos);
+    drawCues(pos, prevDrawD); prevDrawD=pos;             // glyph ticks + ink-flood (no continuous tone)
   } else {                                              // MORPH phase: hand off to the existing T-driven renderer
     if(wormMode!=='full'){ setWormFull(); wormMode='full'; }
     render(pos-1);
@@ -276,7 +287,20 @@ function blip(freq,o){ o=o||{}; const c=audio(); if(!c) return; const t=c.curren
   const v=o.vol==null?.2:o.vol; g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(v,t+.006); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
   osc.connect(g); g.connect(c.destination); osc.start(t); osc.stop(t+dur+.03); }
 const sndTap  =()=>{ blip(2050,{type:'square',dur:.05,vol:.13}); blip(2700,{t:.085,type:'square',dur:.1,vol:.13}); };   // digital reader beep (bip-boop)
-const sndDing =()=>{ blip(760,{type:'sine',dur:.75,vol:.3}); blip(1520,{type:'sine',dur:.5,vol:.08}); };               // stop-request bong
+/* SF Muni "stop requested" chime — a struck bell, not a held beep: instant attack, immediate exponential
+   ring-out, no sustain. Inharmonic partials (non-integer freq ratios that decay faster) give the metallic
+   ding; two strikes, a short one then a longer ring. A gentle low-pass tames the upper partials. */
+const BELL_PARTIALS=[[1,1,1],[2.76,.40,.65],[5.40,.22,.45],[8.93,.11,.30]];   // [freq ratio, rel gain, decay scale]
+function ding(dest,at,freq,decay,gain){ const c=audio(); if(!c) return;
+  BELL_PARTIALS.forEach(([ratio,amp,dec])=>{ const tEnd=at+decay*dec;
+    const g=c.createGain(); g.gain.setValueAtTime(gain*amp,at); g.gain.exponentialRampToValueAtTime(.0001,tEnd);   // struck -> ring out
+    const osc=c.createOscillator(); osc.type='sine'; osc.frequency.value=freq*ratio;
+    osc.connect(g); g.connect(dest); osc.start(at); osc.stop(tEnd+.02); }); }
+const sndDing =()=>{ const c=audio(); if(!c) return;
+  const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=9000; lp.Q.value=.7; lp.connect(c.destination);
+  const freq=1172, gain=.4, t0=c.currentTime+.02;
+  ding(lp,t0,     freq,.35,gain);            // short strike
+  ding(lp,t0+.26, freq,.90,gain); };         // longer ringing strike
 const sndChime=()=>{ [988,1319,1568].forEach((f,i)=>blip(f,{t:i*.15,type:'sine',dur:.5,vol:.16})); };                  // doors / arrival
 const sndTick =()=>blip(820+Math.random()*620,{type:'square',dur:.016,vol:.045});                                       // flap clatter
 /* short decaying noise burst through a bandpass -> a dry, plasticky "tick/tap" (card handling) */
@@ -292,10 +316,22 @@ const sndPutdown=()=>{ clack({freq:780,dur:.075,vol:.17,decay:2.0}); blip(320,{s
 /* per-route tone: each line owns one note of a rising major-pentatonic scale, in route order J K L M N T.
    It sounds the instant the line peels out of the worm and its chip lights. Wind forward and the scale
    climbs J->T; unwind and the same notes fire in reverse, so the scale falls back down. */
-const LINE_SCALE=[523.25,587.33,659.25,783.99,987.77,1046.50];     // C5 D5 E5 G5 B5 C6 — N (Judah) is the major 7th, leaning up into the C6 octave at the top
+const LINE_SCALE=[523.25,587.33,659.25,783.99,987.77,1046.50,1318.51];     // C5 D5 E5 G5 B5 C6 — N (Judah) is the major 7th, leaning up into the C6 octave at the top; E6 caps it for the worm
 function sndLine(rank,dir){ const f=LINE_SCALE[rank]; if(f==null) return;
   if(dir>=0) blip(f,{type:'sine',dur:.42,vol:.17});                          // appear: a clean bell at the line's pitch
   else       blip(f,{type:'triangle',dur:.30,vol:.10,slide:f*0.82}); }       // disappear: softer, bent downward as it folds away
+
+/* the crimson fill flooding into the finished outline -> one warm low swell (soft attack, unlike the struck sounds) */
+function sndInkFlood(){ const c=audio(); if(!c) return; const t=c.currentTime;
+  const osc=c.createOscillator(); osc.type='triangle'; osc.frequency.setValueAtTime(90,t); osc.frequency.exponentialRampToValueAtTime(170,t+.5);
+  const g=c.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.linearRampToValueAtTime(.2,t+.12); g.gain.exponentialRampToValueAtTime(.0001,t+.7);
+  const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=520;
+  osc.connect(g); g.connect(lp); lp.connect(c.destination); osc.start(t); osc.stop(t+.75); }
+/* per-frame draw cues: a soft tick as the pen reaches each glyph of "muni", and the ink-flood as it completes */
+function drawCues(d,pd){
+  for(let i=0;i<wp.length;i++){ const s=DRAW_WIN[i].start; if(s<=0) continue;             // skip the first stroke (starts at 0)
+    if((d>s)!==(pd>s)) clack({freq:1500,dur:.03,vol:.05,decay:3.4}); }                    // pen "catches" a new letter
+  if(d>0.9 && !(pd>0.9)) sndInkFlood(); }                                                 // crimson floods in as the outline closes
 
 /* ---------- progressive reveal: tap in -> fullscreen morph -> click to tap off ---------- */
 const caseEl=document.getElementById('case'), screenEl=document.getElementById('stage');
@@ -428,7 +464,7 @@ card.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.prevent
 /* ---------- arrow keys: step lines one at a time (J K L M N T); hold or mash to fly through ---------- */
 /* stops in master-POS space: 1 = drawn worm · then one stop per line peeling off · 2 = finished map */
 const STOPS=[1].concat([0,1,2,3,4,5].map(r=>1+Math.min(1, r*STEP+SPAN)));
-let lastStep=0;
+let lastStep=0, lastDing=0;
 function goTo(target,dur,tick){ aim=target; audio();   // no step "tick" — each step now rings its line's tone instead
   if(target>0.02) revealCase(); const done=target>=2;
   landG.classList.toggle('show', done); capsG.classList.toggle('show', done); legendEl.classList.toggle('show', done);
@@ -443,7 +479,13 @@ function stepStage(dir,fast){
   // at the normal stepping speed (the clause below targets 1 when base<=1), so the morph reverses briskly.
   if(dir<0 && aim<=1+1e-3 && POS<=1+1e-3){ exitToIntro(); return; }
   let target;
-  if(dir>0){ target=STOPS.find(s=>s>base+1e-3); if(target==null) target=2; }
+  if(dir>0){ target=STOPS.find(s=>s>base+1e-3);
+    if(target==null){                                         // nothing further to wind toward
+      if(POS>=2-1e-3){ const now=performance.now();           // already AT the finished map: pressing right does nothing on screen
+        if(now-lastDing>900){ lastDing=now; sndDing(); }      // -> ring the Muni stop-request chime (debounced so a held key can't stack it)
+        return; }
+      target=2;                                               // still winding the final segment in -> let it finish (an on-screen action, no chime)
+    } }
   else { const p=STOPS.filter(s=>s<base-1e-3); target=p.length?p[p.length-1]:1; }
   goTo(target, fast?90:900, true); }               // snappy; near-instant when holding/mashing so stages fly past
 /* wind/unwind indicator: clickable buttons mirroring the arrow keys, with a press-flash on key/click */
@@ -473,26 +515,38 @@ const INFO={
 };
 const panel=document.getElementById('lineinfo');
 const piBadge=panel.querySelector('.li-badge'), piName=panel.querySelector('.li-name'),
-      piText=panel.querySelector('.li-text'), piMeta=panel.querySelector('.li-meta');
+      piSub=panel.querySelector('.li-sub'), piText=panel.querySelector('.li-text'),
+      piFrom=panel.querySelector('.li-from'), piTo=panel.querySelector('.li-to');
 let pinned=null, hovered=null;   // pinned = typed/clicked (sticky); hovered = pointer preview. Hover wins while present, else falls back to the pinned line.
 const isReady=()=>document.body.classList.contains('map-ready');
 const eff=()=>hovered||pinned;
 function restoreZ(){ Z_ORDER.forEach(k=>linesG.appendChild(paths[TARGETS.indexOf(k)])); }   // back to the designed stack (red under, yellow over)
-function paint(){ const k=eff();
+function paint(){ const k=eff(); const line = !!k && k!=='WORM';   // the worm is selectable like a line, but it's not on the map
   paths.forEach((p,i)=>{ const me=TARGETS[i]===k; p.classList.toggle('hot',me); p.classList.toggle('dim', !!k && !me); });
-  restoreZ(); if(k) linesG.appendChild(paths[TARGETS.indexOf(k)]);   // lift the chosen line above the rest so it never hides under an overlap
-  if(k) capsG.after(linesG); else capsG.before(linesG);              // while a line is focused, raise the whole #lines group above #caps so the chosen line sits over the end caps (restored on clear)
+  restoreZ(); if(line) linesG.appendChild(paths[TARGETS.indexOf(k)]);   // lift the chosen line above the rest so it never hides under an overlap
+  if(line) capsG.after(linesG); else capsG.before(linesG);             // while a line is focused, raise the whole #lines group above #caps so the chosen line sits over the end caps (restored on clear)
   landG.classList.toggle('dim', !!k); capsG.classList.toggle('dim', !!k);
   legendChips.forEach(c=>{ c.el.classList.toggle('cur', c.key===k); c.el.classList.toggle('mut', !!k && c.key!==k); });
-  if(k){ const m=META[k], info=INFO[k];
+  panel.classList.toggle('worm', k==='WORM');
+  // bring the original "muni" logo back, exactly where it sat before the morph (it IS the morph source)
+  if(k==='WORM'){ wormG.classList.add('reveal'); wormG.style.opacity='1'; }
+  else { wormG.classList.remove('reveal'); wormG.style.opacity='0'; }
+  if(k==='WORM'){                                                      // the worm tells the logo's story, not a route
+    panel.style.setProperty('--c', WORM_BLUE);
+    piBadge.textContent=''; piName.textContent='The Worm';            // badge image comes from CSS (.lineinfo.worm .li-badge)
+    piSub.textContent='Muni wordmark · Landor 1975'; piText.textContent=WORM_TEXT;
+    piFrom.textContent='Adopted 1975'; piTo.textContent='Still in service';
+    panel.classList.add('show'); document.body.classList.add('line-selected');
+  } else if(k){ const m=META[k], info=INFO[k];
     panel.style.setProperty('--c', m.color);
     piBadge.textContent=k; piName.textContent=m.name; piText.textContent=info.text;
-    piMeta.innerHTML=`<span>Opened ${info.year}</span><span>${info.from} ↔ ${info.to}</span>`;
+    piSub.textContent=`Muni Metro · Opened ${info.year}`;
+    piFrom.textContent=info.from; piTo.textContent=info.to;
     panel.classList.add('show'); document.body.classList.add('line-selected');
   } else { panel.classList.remove('show'); document.body.classList.remove('line-selected'); } }
 function setHover(k){ if(!isReady()||hovered===k) return; hovered=k; paint(); }
 function dropHover(){ if(hovered===null) return; hovered=null; paint(); }                    // leaving a line / the route list drops the preview, falling back to the pinned line (if any)
-function togglePin(k){ if(!isReady()) return; sndLine(RANK[k], 1); const c=legendChips.find(c=>c.key===k); if(c) pressKey(c.el);   // depress-flash the chip, same as the arrow keys
+function togglePin(k){ if(!isReady()) return; sndLine(k==='WORM'?6:RANK[k], 1); const c=legendChips.find(c=>c.key===k); if(c) pressKey(c.el);   // depress-flash the chip, same as the arrow keys
   pinned = pinned===k ? null : k; paint(); }   // type a letter or click a line/chip to lock it (and ring its note); same again releases it
 function clearSelection(){ if(pinned===null && hovered===null) return; pinned=null; hovered=null; paint(); }
 // hover previews, click/tap pins. Events live on the fixed hit layer (not the reordered visible lines), and the legend chip is a bigger, easier target than the thin ribbon
@@ -508,7 +562,8 @@ addEventListener('keydown', e=>{
   if(e.key==='Escape'){ clearSelection(); return; }
   if(!isReady() || e.metaKey || e.ctrlKey || e.altKey) return;
   const k=e.key.toUpperCase();
-  if(k.length===1 && 'JKLMNT'.indexOf(k)>=0){ e.preventDefault(); togglePin(k); }
+  if(k==='I'){ e.preventDefault(); togglePin('WORM'); }                  // I -> the worm's story, same open/close as the route letters
+  else if(k.length===1 && 'JKLMNT'.indexOf(k)>=0){ e.preventDefault(); togglePin(k); }
 });
 
 /* ---------- start: platform + Clipper only; the case appears on tap-in ---------- */

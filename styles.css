@@ -79,6 +79,11 @@
   .chip .nm{ font-weight:700; font-size:clamp(9.5px,1.1vw,13px); color:var(--ink);
     letter-spacing:.01em; white-space:nowrap; text-shadow:0 1px 2px rgba(255,255,255,.5); }
   .chip.on{ opacity:1 }
+  /* the worm chip badge is the SFMTA app icon, cropped to the circle (no letter) */
+  .chip-worm .badge{ background:#0C6CB5 url("muni-worm-icon.png") center/cover no-repeat; }
+  /* the worm story re-reveals the actual morph-source #worm logo (exact pre-morph position/size).
+     transition is scoped to .reveal so the morph's instant worm<->lines hand-off is never cross-faded. */
+  #worm.reveal{ transition:opacity .5s ease; }
   .chip.press .badge{ animation:winderpress .26s ease; }   /* same depress flash as the arrow keys, on click / tap / J K L M N T */
 
   /* ---- wind / unwind: arrow-key indicator (bottom-left), styled to match the route-list badges ---- */
@@ -154,25 +159,45 @@
   .chip.mut{ opacity:.16 !important; }                             /* dim non-selected legend chips (overrides .on) */
   .chip.cur{ opacity:1 !important; }
 
-  /* the story placard — a dark Muni-platform info plate, colored to the line, fixed (not scaled with the map) */
+  /* the story placard — a fragment of the map itself: a route spine with two terminus markers
+     brackets a dark Muni-platform plate, colored to the line. Fixed (not scaled with the map). */
   .lineinfo{ --c:#888; position:fixed; right:clamp(16px,3.5vw,52px); bottom:clamp(18px,6vh,58px); z-index:40;
-    width:min(390px,84vw); padding:22px 26px 20px; border-radius:11px;
-    background:linear-gradient(180deg,#231d17,#15110d); color:#f4efe5;
-    border-top:4px solid var(--c);
-    box-shadow:0 34px 70px -22px rgba(0,0,0,.78), inset 0 1px 0 rgba(255,255,255,.06), 0 0 0 1px rgba(0,0,0,.5);
+    width:min(404px,85vw); min-height:272px; padding:22px 26px 22px 20px; border-radius:13px;
+    display:flex; gap:19px; align-items:stretch;
+    background:linear-gradient(157deg,#26201a 0%,#1a1510 52%,#120e0a 100%); color:#f4efe5;
+    box-shadow:0 34px 70px -22px rgba(0,0,0,.78), inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(0,0,0,.5);
     font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;
     opacity:0; transform:translateY(16px) scale(.985); transform-origin:bottom right; pointer-events:none;
     transition:opacity .42s ease, transform .42s cubic-bezier(.2,.85,.25,1); }
-  .lineinfo.show{ opacity:1; transform:none; pointer-events:auto; }
-  .li-head{ display:flex; align-items:center; gap:14px; }
-  .li-badge{ flex:0 0 auto; width:48px; height:48px; border-radius:50%; background:var(--c); color:#fff;
-    display:grid; place-items:center; font-weight:800; font-size:25px; line-height:1; box-shadow:inset 0 0 0 1px rgba(0,0,0,.18); }
-  .li-title{ display:flex; flex-direction:column; gap:5px; }
-  .li-name{ font-weight:800; font-size:25px; letter-spacing:-.015em; line-height:1; }
-  .li-sub{ font-size:9.5px; letter-spacing:.3em; text-transform:uppercase; font-weight:700; color:var(--c); }
-  .li-text{ margin-top:17px; font-size:13.5px; line-height:1.62; color:#d8d1c5; }
-  .li-meta{ margin-top:16px; padding-top:13px; border-top:1px solid rgba(255,255,255,.1);
-    display:flex; flex-wrap:wrap; gap:7px 18px; font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; font-weight:700; color:#9b9286; }
+  /* stays pointer-events:none even when shown — it's a passive info panel, and the T line runs behind it;
+     if the card captured the pointer it would steal hover from the line and flicker on/off. */
+  .lineinfo.show{ opacity:1; transform:none; }
+
+  /* the route spine: terminus · rail · terminus, drawn in the line color (echoes the map's end-caps) */
+  .li-spine{ position:relative; z-index:1; flex:0 0 16px; display:flex; flex-direction:column; align-items:center; padding:5px 0 3px; }
+  .li-term{ flex:0 0 auto; width:15px; height:15px; border-radius:50%; background:transparent;
+    border:3px solid var(--c); box-sizing:border-box; }   /* open ring in the route color, empty center (like the map end-caps) */
+  .li-rail{ width:4px; flex:1 1 auto; margin:-2px 0; border-radius:3px; background:var(--c);
+    transform:scaleY(0); transform-origin:top center; }
+  .lineinfo.show .li-rail{ animation:railDraw .5s cubic-bezier(.4,0,.2,1) .12s both; }
+  .lineinfo.show .li-term-b{ animation:termPop .32s cubic-bezier(.3,1.5,.5,1) .52s both; }
+  @keyframes railDraw{ from{transform:scaleY(0)} to{transform:scaleY(1)} }
+  @keyframes termPop{ 0%{transform:scale(0)} 100%{transform:scale(1)} }
+
+  .li-body{ flex:1 1 auto; min-width:0; position:relative; z-index:1; display:flex; flex-direction:column; }
+  .li-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
+  .li-title{ display:flex; flex-direction:column; gap:7px; min-width:0; }
+  .li-name{ font-weight:800; font-size:27px; letter-spacing:-.02em; line-height:.95; }
+  .li-sub{ font-size:9px; letter-spacing:.26em; text-transform:uppercase; font-weight:700; color:var(--c); }
+  .li-badge{ flex:0 0 auto; width:46px; height:46px; border-radius:50%; background:var(--c); color:#fff;
+    display:grid; place-items:center; font-weight:800; font-size:24px; line-height:1; }
+  .lineinfo.worm .li-badge{ background:#0C6CB5 url("muni-worm-icon.png") center/cover no-repeat; }
+  .li-text{ margin-top:16px; font-size:13.5px; line-height:1.62; color:#d8d1c5; }
+  /* termini row — the line runs from ◀ to ▶ */
+  .li-termini{ margin-top:auto; padding-top:15px; display:flex; align-items:center; gap:9px;
+    font-size:11px; letter-spacing:.04em; font-weight:700; color:#efe9dd; }
+  .li-end{ white-space:nowrap; }
+  .li-arrow{ flex:0 0 auto; color:var(--c); font-weight:800; font-size:14px; transform:translateY(-1px); }
 
   /* one-time nudge once the map settles */
   .li-hint{ position:fixed; right:clamp(14px,4vw,42px); bottom:clamp(18px,6vh,58px); z-index:39;

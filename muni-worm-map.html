@@ -52,14 +52,22 @@
     <div class="exit" id="exit">click anywhere to tap off</div>
   </main>
 
-  <!-- line explorer (finished-map only): hover/tap a line -> its story; fixed overlay, not scaled with the map -->
+  <!-- line explorer (finished-map only): hover/tap a line -> its story. A fragment of the map itself:
+       a route spine with two terminus markers brackets the card, colored to the line. -->
   <aside class="lineinfo" id="lineinfo" aria-live="polite">
-    <div class="li-head">
-      <span class="li-badge"></span>
-      <span class="li-title"><span class="li-name"></span><span class="li-sub">Muni Metro line</span></span>
+    <div class="li-spine" aria-hidden="true">
+      <span class="li-term li-term-a"></span>
+      <span class="li-rail"></span>
+      <span class="li-term li-term-b"></span>
     </div>
-    <p class="li-text"></p>
-    <div class="li-meta"></div>
+    <div class="li-body">
+      <div class="li-head">
+        <span class="li-title"><span class="li-name"></span><span class="li-sub"></span></span>
+        <span class="li-badge"></span>
+      </div>
+      <p class="li-text"></p>
+      <div class="li-termini"><span class="li-end li-from"></span><span class="li-arrow">→</span><span class="li-end li-to"></span></div>
+    </div>
   </aside>
   <div class="li-hint" id="lihint">Hover a line · or press J K L M N T</div>
 
