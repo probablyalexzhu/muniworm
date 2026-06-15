@@ -1,0 +1,181 @@
+  :root{
+    /* --- vintage SF bus palette (sampled from a photo of an old Muni bus) --- */
+    --bus-white:#cacfd5;     /* cool off-white  */
+    --bus-orange:#ba6e3a;    /* burnt orange    */
+    --bus-red:#942f25;       /* weathered brick red */
+
+    --bg:#cacfd5; --ink:#2c2620; --muted:#736a5e;
+    --worm:#cc3847;          /* the Muni worm — original Landor logo red (from worm_logo.svg) */
+    --worm-i:#cf2645;        /* the "i" bar — the original logo's second, slightly more crimson tone */
+    --land:#c1beb6;          /* SF silhouette, warm landmass under the off-white */
+    --accent:var(--bus-orange);   /* UI accent (play button, scrubber) */
+    --grid:rgba(70,52,36,.12);
+    --track:rgba(48,34,22,.16);
+    --panel:rgba(44,32,20,.05);
+    --panel-bd:rgba(44,32,20,.18);
+    --thumb:#fff;
+    --bgA:#dde0e5; --bgB:#c4c1ba;   /* body vignette stops */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%; overflow:hidden}
+  body{
+    background:#0b0d11;
+    color:var(--ink); font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;
+    min-height:100vh; display:flex; flex-direction:column; justify-content:center; overflow-x:hidden; position:relative;
+  }
+  /* the Powell platform — its own layer so it can dim + blur (rack-focus) when you tap in */
+  .bg{ position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(125% 105% at 50% 36%, rgba(14,16,20,.35) 30%, rgba(14,16,20,.7) 100%),
+      linear-gradient(rgba(14,16,20,.5), rgba(14,16,20,.62)),
+      url("powell.jpg") center/cover no-repeat;
+    transition:filter 1.4s ease, transform 1.4s ease; }
+  body.playing .bg{ filter:blur(8px) brightness(.4) saturate(.85); transform:scale(1.07); }
+  body::before{ content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:radial-gradient(var(--grid) 1px, transparent 1.4px);
+    background-size:34px 34px;
+    -webkit-mask-image:radial-gradient(circle at 52% 42%, #000 0%, rgba(0,0,0,.22) 72%, transparent 100%);
+            mask-image:radial-gradient(circle at 52% 42%, #000 0%, rgba(0,0,0,.22) 72%, transparent 100%); }
+  body::after{ content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opacity:.04;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+  main{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;
+       min-height:100vh;padding:clamp(14px,3.5vh,46px) clamp(10px,3vw,40px)}
+
+  /* map screen wrapper (steel frame removed) — transparent, just positions + scales the screen; revealed on tap-in */
+  .case{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) scale(.96);
+    width:min(940px,86vw); isolation:isolate;
+    opacity:0; pointer-events:none; transition:opacity .6s ease, transform 1.5s cubic-bezier(.45,.05,.25,1); }
+  .case.shown{ opacity:1; pointer-events:auto; transform:translate(-50%,-50%) scale(1); }  /* fill transform set inline on reveal */
+
+  /* backlit screen */
+  .screen{ position:relative; width:100%; aspect-ratio:1200/760; overflow:hidden;
+    background:radial-gradient(125% 115% at 50% 36%, #dadfe5 0%, #c6cbd1 58%, #b6bbc2 100%); }
+  .screen.power{ animation:power 1.1s ease both; }
+  @keyframes power{ 0%{filter:brightness(.25)} 7%{filter:brightness(1.35)} 11%{filter:brightness(.45)} 19%{filter:brightness(1.2)} 27%{filter:brightness(.7)} 42%{filter:brightness(1.06)} 60%{filter:brightness(.96)} 100%{filter:brightness(1)} }
+  svg{width:100%;height:100%;display:block;overflow:visible}
+  #landPath{fill:var(--land)}
+  #land{ opacity:0; transition:opacity .8s ease; }   /* SF silhouette appears only after the morph completes */
+  #land.show{ opacity:1; }
+  #caps{ opacity:0; transition:opacity .8s ease; }   /* line end caps appear with the finished map */
+  #caps.show{ opacity:1; }
+  #worm path{fill:var(--worm)}
+  #worm path:nth-child(2){fill:var(--worm-i)}   /* the "i" bar is a hair more crimson in the original logo */
+  #lines, #stations{filter:drop-shadow(0 1.5px 1.5px rgba(70,40,22,.32))}
+  #stations .hub{fill:var(--bg);stroke:var(--ink)}
+
+  /* line legend — real-transit-map circle markers, overlaid on the map (left) */
+  .legend{ position:absolute; left:clamp(8px,1.8%,22px); top:clamp(8px,2.4%,26px); z-index:4;
+    display:flex; flex-direction:column; gap:clamp(1px,.3vw,4px); align-items:flex-start; pointer-events:none;
+    opacity:0; transition:opacity .8s ease; }   /* hidden until the morph completes, then fades in with the land + end caps */
+  .legend.show{ opacity:1; }
+  .chip{ --c:#888; display:flex; align-items:center; gap:clamp(6px,.8vw,10px);
+    padding:5px 16px 5px 0;                       /* transparent pad -> bigger, more forgiving hit target (rows nearly touch; badge unmoved) */
+    opacity:.22; transition:opacity .45s ease; }
+  .chip .badge{ width:clamp(20px,2.4vw,30px); aspect-ratio:1; border-radius:50%;
+    display:grid; place-items:center; background:var(--c); color:#fff;
+    font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; font-weight:800; line-height:1;
+    font-size:clamp(11px,1.4vw,16px); }
+  .chip .nm{ font-weight:700; font-size:clamp(9.5px,1.1vw,13px); color:var(--ink);
+    letter-spacing:.01em; white-space:nowrap; text-shadow:0 1px 2px rgba(255,255,255,.5); }
+  .chip.on{ opacity:1 }
+
+  /* ---- wind / unwind: arrow-key indicator (bottom-left), styled to match the route-list badges ---- */
+  .winder{ position:absolute; left:clamp(8px,1.8%,22px); bottom:clamp(10px,3vh,28px); z-index:6;
+    display:flex; align-items:center; gap:clamp(6px,.8vw,10px);
+    opacity:0; transform:translateY(6px); transition:opacity .6s ease, transform .6s ease; pointer-events:none; }
+  body.playing .winder{ opacity:1; transform:none; pointer-events:auto; }
+  .winder-key{ width:clamp(20px,2.4vw,30px); aspect-ratio:1; border-radius:50%; border:0; padding:0; cursor:pointer;
+    display:grid; place-items:center; -webkit-tap-highlight-color:transparent;
+    background:#BB6F3C; color:#fff;
+    transition:transform .12s cubic-bezier(.3,1.4,.5,1), filter .15s ease; }
+  .winder-key svg{ width:58%; height:58%; fill:#fff; stroke:none; }
+  .winder-key:hover{ filter:brightness(1.08); }
+  .winder-key:active, .winder-key.press{ transform:scale(.82); filter:brightness(.92); }
+  .winder-key.press{ animation:winderpress .26s ease; }
+  @keyframes winderpress{ 0%{transform:scale(1)} 34%{transform:scale(.8); filter:brightness(.88)} 100%{transform:scale(1)} }
+
+  /* ---- intro: reader (left) + Clipper card (right), tightened toward center for less drag travel ---- */
+  .reader{ position:absolute; top:50%; left:38%; transform:translate(-50%,-50%); z-index:6;
+    width:min(33vmin,330px); height:min(33vmin,330px); border-radius:50%;
+    background:#0c4a82 url("clipper-reader.png") center/cover no-repeat;
+    box-shadow:0 10px 30px rgba(0,0,0,.5), inset 0 0 0 2px rgba(0,0,0,.18);
+    transition:opacity .55s ease, box-shadow .15s ease; }
+  .reader.armed{ box-shadow:0 0 0 6px rgba(95,225,105,.6), 0 10px 30px rgba(0,0,0,.5); }
+  .reader.tap{ box-shadow:0 0 0 10px rgba(95,225,105,.8), 0 0 54px 16px rgba(95,225,105,.55); }
+  .ccard{ position:absolute; top:50%; left:62%; transform:translate(-50%,-50%); z-index:7;
+    aspect-ratio:200/310; height:min(36vmin,293px); border-radius:11px; cursor:grab; touch-action:none; will-change:transform;
+    background:#11568f url("clipper-card.png") center/cover no-repeat;
+    box-shadow:0 18px 40px rgba(0,0,0,.45);
+    transition:opacity .55s ease, transform .35s cubic-bezier(.3,1.3,.5,1); }
+  .ccard.dragging{ cursor:grabbing; transition:opacity .55s ease; z-index:30; box-shadow:0 34px 64px rgba(0,0,0,.55) }
+  .hint{ position:absolute; left:50%; bottom:clamp(28px,9vh,90px); transform:translateX(-50%); z-index:8;
+    font-size:clamp(12px,1.5vw,15px); letter-spacing:.18em; text-transform:uppercase; font-weight:700; color:#f3f0ea;
+    text-shadow:0 1px 6px rgba(0,0,0,.85); white-space:nowrap; transition:opacity .4s ease; animation:hintpulse 2.4s ease-in-out infinite; }
+  .hint.gone{ opacity:0; pointer-events:none; animation:none; }
+  @keyframes hintpulse{ 0%,100%{opacity:.5} 50%{opacity:1} }
+  /* the quiet "way back" — fades in after the morph, then fades out */
+  .exit{ position:fixed; left:50%; bottom:clamp(22px,5vh,46px); transform:translateX(-50%); z-index:9; pointer-events:none;
+    font-size:11px; letter-spacing:.22em; text-transform:uppercase; font-weight:700; color:rgba(255,255,255,.7);
+    text-shadow:0 1px 6px rgba(0,0,0,.9); opacity:0; transition:opacity .6s ease; }
+  .exit.show{ opacity:1; }
+  /* once tapped in, the intro pieces fade away */
+  body.playing .reader, body.playing .ccard, body.playing .hint{ opacity:0; pointer-events:none; }
+
+  /* stop-request cord — appears after the morph */
+  .stopctl{ position:absolute; left:50%; bottom:clamp(18px,5vh,46px); transform:translateX(-50%); z-index:6;
+    opacity:0; pointer-events:none; transition:opacity .5s ease; }
+  .stopctl.shown{ opacity:1; pointer-events:auto; }
+  .cord{ display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent }
+  .cordpull{ display:flex;flex-direction:column;align-items:center }
+  .cordline{ width:4px;height:46px;border-radius:2px;background:linear-gradient(#866039,#5b4027);box-shadow:0 1px 2px rgba(0,0,0,.4) }
+  .cordknob{ width:26px;height:26px;border-radius:50%;margin-top:-3px;background:radial-gradient(circle at 35% 30%,#cf9156,#8a5a30);
+    box-shadow:0 3px 5px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.3) }
+  .cord:hover .cordknob{ filter:brightness(1.07) }
+  .cord.pulled .cordpull{ animation:pull .55s cubic-bezier(.3,1.5,.5,1) }
+  @keyframes pull{ 0%{transform:translateY(0)} 38%{transform:translateY(16px)} 100%{transform:translateY(0)} }
+  .cordlamp{ font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#fff;
+    background:#9a4036;padding:4px 9px;border-radius:4px;opacity:.85;transition:.18s;text-shadow:0 1px 2px rgba(0,0,0,.5);box-shadow:0 1px 3px rgba(0,0,0,.4), inset 0 0 0 1px rgba(0,0,0,.2) }
+  .cord.pulled .cordlamp{ opacity:1;background:#e23a2e;box-shadow:0 0 16px 0 #e23a2e }
+
+  /* ============ line explorer: focus a single line, dim the rest, show its story ============ */
+  /* lines/legend only respond on the finished map */
+  #lines path{ transition:opacity .32s ease, filter .32s ease; }
+  #lines path.lnpath{ stroke:transparent; stroke-width:12px; }              /* invisible padding -> a more forgiving hover/click target than the thin ribbon */
+  body.map-ready #lines path.lnpath{ pointer-events:all; cursor:pointer; }   /* hit the fill OR the padded transparent band */
+  #lines path.dim{ opacity:.1; }                                   /* the other routes recede */
+  #lines path.hot{ filter:brightness(1.04) drop-shadow(0 0 5px rgba(0,0,0,.28)); }
+  #land.show.dim{ opacity:.2; transition:opacity .3s ease; } #caps.show.dim{ opacity:.22; transition:opacity .3s ease; }   /* darken landform + end caps so the chosen line pops (snappy dim-in; gentle fade back) */
+  body.map-ready .legend{ pointer-events:auto; }   /* contiguous hit region: pointerleave fires only when leaving the whole list, and gaps between chips don't drop the focus */
+  body.map-ready .chip{ pointer-events:auto; cursor:pointer; }
+  .legend .chip{ transition:opacity .3s ease; }
+  .chip.mut{ opacity:.16 !important; }                             /* dim non-selected legend chips (overrides .on) */
+  .chip.cur{ opacity:1 !important; }
+
+  /* the story placard — a dark Muni-platform info plate, colored to the line, fixed (not scaled with the map) */
+  .lineinfo{ --c:#888; position:fixed; right:clamp(16px,3.5vw,52px); bottom:clamp(18px,6vh,58px); z-index:40;
+    width:min(390px,84vw); padding:22px 26px 20px; border-radius:11px;
+    background:linear-gradient(180deg,#231d17,#15110d); color:#f4efe5;
+    border-top:4px solid var(--c);
+    box-shadow:0 34px 70px -22px rgba(0,0,0,.78), inset 0 1px 0 rgba(255,255,255,.06), 0 0 0 1px rgba(0,0,0,.5);
+    font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;
+    opacity:0; transform:translateY(16px) scale(.985); transform-origin:bottom right; pointer-events:none;
+    transition:opacity .42s ease, transform .42s cubic-bezier(.2,.85,.25,1); }
+  .lineinfo.show{ opacity:1; transform:none; pointer-events:auto; }
+  .li-head{ display:flex; align-items:center; gap:14px; }
+  .li-badge{ flex:0 0 auto; width:48px; height:48px; border-radius:50%; background:var(--c); color:#fff;
+    display:grid; place-items:center; font-weight:800; font-size:25px; line-height:1; box-shadow:inset 0 0 0 1px rgba(0,0,0,.18); }
+  .li-title{ display:flex; flex-direction:column; gap:5px; }
+  .li-name{ font-weight:800; font-size:25px; letter-spacing:-.015em; line-height:1; }
+  .li-sub{ font-size:9.5px; letter-spacing:.3em; text-transform:uppercase; font-weight:700; color:var(--c); }
+  .li-text{ margin-top:17px; font-size:13.5px; line-height:1.62; color:#d8d1c5; }
+  .li-meta{ margin-top:16px; padding-top:13px; border-top:1px solid rgba(255,255,255,.1);
+    display:flex; flex-wrap:wrap; gap:7px 18px; font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; font-weight:700; color:#9b9286; }
+
+  /* one-time nudge once the map settles */
+  .li-hint{ position:fixed; right:clamp(14px,4vw,42px); bottom:clamp(18px,6vh,58px); z-index:39;
+    font:700 10px/1 "Helvetica Neue",Helvetica,Arial,sans-serif; letter-spacing:.26em; text-transform:uppercase;
+    color:rgba(255,255,255,.6); text-shadow:0 1px 5px rgba(0,0,0,.85);
+    opacity:0; pointer-events:none; transition:opacity .6s ease .35s; }
+  body.map-ready .li-hint{ opacity:1; }
+  body.line-selected .li-hint{ opacity:0; transition:opacity .25s ease; }
