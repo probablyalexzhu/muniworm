@@ -102,6 +102,20 @@
   .winder-key.press{ animation:winderpress .26s ease; }
   @keyframes winderpress{ 0%{transform:scale(1)} 34%{transform:scale(.8); filter:brightness(.88)} 100%{transform:scale(1)} }
 
+  /* ---- intro title: the minimal wordmark + one line of framing, top-centered before tap-in ---- */
+  .intro-title{ position:absolute; left:50%; top:clamp(24px,7vh,84px); transform:translateX(-50%);
+    z-index:8; display:flex; flex-direction:column; align-items:center; text-align:center;
+    pointer-events:none; transition:opacity .55s ease, transform .55s ease; }
+  .it-logo{ width:clamp(150px,24vw,260px); height:auto; display:block;
+    filter:drop-shadow(0 2px 14px rgba(0,0,0,.55)); }
+  .it-logo path{ fill:none; stroke-width:4; stroke-linejoin:round; stroke-linecap:round; }
+  .it-logo-worm path{ stroke:var(--worm); }    /* the worm body — original Landor red */
+  .it-logo-i{ stroke:var(--worm-i); }          /* the "i" bar — the logo's slightly more crimson tone */
+  .it-line{ margin-top:clamp(10px,1.6vh,18px); font-size:clamp(12px,1.5vw,15px); letter-spacing:.34em;
+    text-transform:uppercase; font-weight:700; color:#f3f0ea; text-shadow:0 1px 8px rgba(0,0,0,.85); }
+  .it-sub{ margin-top:clamp(6px,1vh,11px); font-size:clamp(11px,1.2vw,13px); letter-spacing:.03em;
+    color:rgba(243,240,234,.6); text-shadow:0 1px 6px rgba(0,0,0,.8); max-width:34ch; }
+
   /* ---- intro: reader (left) + Clipper card (right), tightened toward center for less drag travel ---- */
   .reader{ position:absolute; top:50%; left:38%; transform:translate(-50%,-50%); z-index:6;
     width:min(33vmin,330px); height:min(33vmin,330px); border-radius:50%;
@@ -110,7 +124,7 @@
     transition:opacity .55s ease, box-shadow .15s ease; }
   .reader.armed{ box-shadow:0 0 0 6px rgba(167,194,67,.7), 0 10px 30px rgba(0,0,0,.5); }
   .reader.tap{ box-shadow:0 0 0 10px rgba(167,194,67,.9), 0 0 54px 16px rgba(167,194,67,.55); }
-  .ccard{ position:absolute; top:50%; left:62%; transform:translate(-50%,-50%); z-index:7;
+  .ccard{ position:absolute; top:50%; left:62%; transform:translate(-50%,-50%); z-index:12;  /* above the intro title (8), hint (8) and exit (9) text */
     aspect-ratio:200/310; height:min(36vmin,293px); border-radius:11px; cursor:grab; touch-action:none; will-change:transform;
     background:#11568f url("clipper-card.png") center/cover no-repeat;
     box-shadow:0 18px 40px rgba(0,0,0,.45);
@@ -118,7 +132,8 @@
   .ccard.dragging{ cursor:grabbing; transition:opacity .55s ease; z-index:30; box-shadow:0 34px 64px rgba(0,0,0,.55) }
   .hint{ position:absolute; left:50%; bottom:clamp(28px,9vh,90px); transform:translateX(-50%); z-index:8;
     font-size:clamp(12px,1.5vw,15px); letter-spacing:.18em; text-transform:uppercase; font-weight:700; color:#f3f0ea;
-    text-shadow:0 1px 6px rgba(0,0,0,.85); white-space:nowrap; transition:opacity .4s ease; animation:hintpulse 2.4s ease-in-out infinite; }
+    text-shadow:0 1px 6px rgba(0,0,0,.85); text-align:center; max-width:min(88vw,36ch); line-height:1.5;
+    transition:opacity .4s ease; animation:hintpulse 2.4s ease-in-out infinite; }
   .hint.gone{ opacity:0; pointer-events:none; animation:none; }
   @keyframes hintpulse{ 0%,100%{opacity:.5} 50%{opacity:1} }
   /* the quiet "way back" — fades in after the morph, then fades out */
@@ -128,6 +143,7 @@
   .exit.show{ opacity:1; }
   /* once tapped in, the intro pieces fade away */
   body.playing .reader, body.playing .ccard, body.playing .hint{ opacity:0; pointer-events:none; }
+  body.playing .intro-title{ opacity:0; transform:translateX(-50%) translateY(-14px); }
 
   /* stop-request cord — appears after the morph */
   .stopctl{ position:absolute; left:50%; bottom:clamp(18px,5vh,46px); transform:translateX(-50%); z-index:6;
