@@ -9,9 +9,9 @@ import { TARGETS, RANK } from './data.js';
 import { ease, mix, toPath } from './geometry.js';
 import { MORPH, BASE, DST, wormG } from './morph.js';
 import { paths, hitPaths, linesG, stationsG, legendChips } from './scene.js';
-import { sndLine } from './audio.js';
+import { sndLine, sndArrive } from './audio.js';
 import { armWorm, setWormFull, renderDraw, drawCues } from './draw.js';
-import { clearSelection } from './explorer.js';
+import { clearSelection, suppressHover } from './explorer.js';
 
 const SEQ = TARGETS.map(k => RANK[k]);   // stagger rank per morph element
 
@@ -22,6 +22,15 @@ let aim = 1;            // in-flight target (for mid-flight stepping)
 let wormMode = null;    // 'draw' | 'full' — avoids per-frame restyle thrash
 let prevRenderT = 0;    // last morph T seen by render() — catches each line's threshold crossing for its tone
 let prevDrawD = 0;      // last draw-fraction seen by renderMaster() — lets drawCues() catch glyph + ink-flood crossings
+let lastArrive = 0;     // debounce the arrival flourish so winding back-and-forth across T=1 can't stack it
+
+/** Celebratory run-up-the-scale when the map fully lands; delayed so it follows the last line's note. */
+function scheduleArrive() {
+  const now = performance.now();
+  if (now - lastArrive < 1500) return;
+  lastArrive = now;
+  setTimeout(sndArrive, 420);   // let the final line's tone ring first, then the flourish
+}
 
 export const getPos = () => POS;
 export const getAim = () => aim;
@@ -62,6 +71,7 @@ function render(T) {
     if (T > th && !(prevRenderT > th)) sndLine(r.rank, 1);     // crossed forward: line starts peeling out → rising note
     else if (prevRenderT > th && !(T > th)) sndLine(r.rank, -1); // crossed backward: line folds back in → falling note
   });
+  if (T >= 1 && !(prevRenderT >= 1)) { scheduleArrive(); suppressHover(1000); }   // crossed into the map → flourish + protect the reveal from hover-dimming
   prevRenderT = T;
   document.body.classList.toggle('map-ready', T >= 1);   // only the finished map is interactive (lines selectable)
   if (T < 1) clearSelection();                           // stepping/folding away from the map drops any line selection

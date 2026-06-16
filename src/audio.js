@@ -62,13 +62,15 @@ function gateDing(freq, decay, tame, gain) {
   const at = c.currentTime + 0.02;
   GATE_PARTIALS.forEach(([ratio, amp, decScale]) => {
     const tEnd = at + decay * decScale;
-    const g = c.createGain(); g.gain.setValueAtTime(gain * amp, at); g.gain.exponentialRampToValueAtTime(.0001, tEnd);   // struck → ring out
+    const g = c.createGain(); g.gain.setValueAtTime(.0001, at);
+    g.gain.exponentialRampToValueAtTime(gain * amp, at + .012);          // rounded attack — softens the sharp transient
+    g.gain.exponentialRampToValueAtTime(.0001, tEnd);                    // ring out
     const osc = c.createOscillator(); osc.type = 'sine'; osc.frequency.value = freq * ratio;
     osc.connect(g); g.connect(lp); osc.start(at); osc.stop(tEnd + .02);
   });
 }
-/** Reader accept: the Clipper gate ding. */
-export const sndTap = () => gateDing(2877, 0.55, 6500, .3);
+/** Reader accept: the Clipper gate ding (softened — lower cutoff + gentler level). */
+export const sndTap = () => gateDing(2877, 0.5, 4000, .19);
 
 /* ---------- SF Muni "stop requested" chime ----------
    A struck bell, not a held beep: instant attack, immediate exponential ring-out, no sustain.
@@ -79,15 +81,17 @@ function ding(dest, at, freq, decay, gain) {
   const c = audio(); if (!c) return;
   BELL_PARTIALS.forEach(([ratio, amp, dec]) => {
     const tEnd = at + decay * dec;
-    const g = c.createGain(); g.gain.setValueAtTime(gain * amp, at); g.gain.exponentialRampToValueAtTime(.0001, tEnd);   // struck → ring out
+    const g = c.createGain(); g.gain.setValueAtTime(.0001, at);
+    g.gain.exponentialRampToValueAtTime(gain * amp, at + .012);          // rounded attack (softer than an instant strike)
+    g.gain.exponentialRampToValueAtTime(.0001, tEnd);                    // ring out
     const osc = c.createOscillator(); osc.type = 'sine'; osc.frequency.value = freq * ratio;
     osc.connect(g); g.connect(dest); osc.start(at); osc.stop(tEnd + .02);
   });
 }
 export const sndDing = () => {
   const c = audio(); if (!c) return;
-  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 9000; lp.Q.value = .7; lp.connect(master);
-  const freq = 1172, gain = .4, t0 = c.currentTime + .02;
+  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3800; lp.Q.value = .7; lp.connect(master);   // lower cutoff rolls off the harsh upper partials
+  const freq = 1172, gain = .2, t0 = c.currentTime + .02;
   ding(lp, t0, freq, .35, gain);            // short strike
   ding(lp, t0 + .26, freq, .90, gain);      // longer ringing strike
 };
@@ -103,6 +107,15 @@ export function sndLine(rank, dir) {
   else blip(f, { type: 'triangle', dur: .30, vol: .10, slide: f * 0.82 });       // disappear: softer, bent downward as it folds away
 }
 
+/** Celebratory flourish when the finished map lands — a quick run up the same scale, resolving on a ringing top chord. */
+export function sndArrive() {
+  const dt = .058;
+  LINE_SCALE.forEach((f, i) => blip(f, { t: i * dt, type: 'sine', dur: .45, vol: .11 }));   // quick run up C5 → E6
+  const top = LINE_SCALE.length * dt;
+  blip(LINE_SCALE[6], { t: top, type: 'sine', dur: 1.1, vol: .14 });                        // land on the top note…
+  blip(LINE_SCALE[6] * 1.5, { t: top + .02, type: 'sine', dur: 1.1, vol: .09 });            // …with a fifth above → a bright ring-out
+}
+
 /** The crimson fill flooding into the finished outline → one warm low swell (soft attack, unlike the struck sounds). */
 export function sndInkFlood() {
   const c = audio(); if (!c) return; const t = c.currentTime;
@@ -115,7 +128,7 @@ export function sndInkFlood() {
 /** A soft "tick" as the pen catches each glyph of the worm outline while drawing. */
 export const sndGlyphTick = () => clack({ freq: 1500, dur: .03, vol: .05, decay: 3.4 });
 
-/** Light lift of the Clipper card off the surface (rising). */
-export const sndPickup = () => { clack({ freq: 1650, dur: .05, vol: .13, decay: 3.2 }); blip(520, { slide: 700, type: 'triangle', dur: .05, vol: .05 }); };
-/** Set the card back down — a soft, lower "tup" (falling). */
-export const sndPutdown = () => { clack({ freq: 780, dur: .075, vol: .17, decay: 2.0 }); blip(320, { slide: 210, type: 'triangle', dur: .07, vol: .06 }); };
+/** Light lift of the Clipper card off the surface (rising) — softer, less clacky. */
+export const sndPickup = () => { clack({ freq: 1250, dur: .05, vol: .07, decay: 3.6, q: .55 }); blip(520, { slide: 700, type: 'triangle', dur: .07, vol: .06 }); };
+/** Set the card back down — a soft, lower "tup" (falling) — softer, less clacky. */
+export const sndPutdown = () => { clack({ freq: 620, dur: .07, vol: .09, decay: 2.6, q: .55 }); blip(320, { slide: 210, type: 'triangle', dur: .09, vol: .07 }); };

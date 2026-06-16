@@ -16,7 +16,7 @@ function tapAccept() { audio(); reader.classList.add('tap'); sndTap(); setTimeou
 
 let homeOff = { x: 0, y: 0 };   // the card's persistent offset from its CSS home — it stays wherever you drop it
 /** Snap the card back to its CSS home (called when the experience rewinds to the intro). */
-export function resetCard() { homeOff = { x: 0, y: 0 }; card.style.transition = ''; card.style.transform = 'translate(-50%,-50%)'; card.style.transformOrigin = ''; }
+export function resetCard() { homeOff = { x: 0, y: 0 }; card.style.transition = ''; card.style.transform = 'translate(-50%,-50%)'; card.style.transformOrigin = ''; card.classList.remove('placed'); }
 
 let drag = null, physReq = null;
 const PULL = 0.055, DAMP = 1.8, REST = 2.2;   // PULL=how hard motion rotates it · DAMP=settle · REST=return-upright (loose = flickable)
@@ -85,6 +85,7 @@ card.addEventListener('pointerup', e => {
     if (physReq) { cancelAnimationFrame(physReq); physReq = null; }
     card.style.transition = 'transform .24s cubic-bezier(.3,.85,.3,1)';   // "fall" flat onto the reader (glide + settle slightly askew)
     card.style.transform = `translate(-50%,-50%) translate(${tx}px,${ty}px) rotate(${jr.toFixed(2)}deg)`;
+    card.classList.add('placed');   // stop the "pick me up" glow once it's on the reader
     tapAccept();
     setTimeout(startPlay, 1000);                                // hold a beat on the reader, then the worm appears + morph
   } else { drag.held = false; sndPutdown(); }                   // dropped off the reader: soft put-down, then the flick carries home via physics

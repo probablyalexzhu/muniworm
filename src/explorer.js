@@ -19,6 +19,10 @@ let pinned = null, hovered = null;   // pinned = typed/clicked (sticky); hovered
 const isReady = () => document.body.classList.contains('map-ready');
 const eff = () => hovered || pinned;
 
+let hoverLockUntil = 0;   // hover is ignored until this time — keeps a stationary pointer from dimming the map during the big reveal
+/** Briefly ignore hover (called by render the moment the map lands) so the caps/legend reveal isn't pre-dimmed. */
+export function suppressHover(ms) { hoverLockUntil = performance.now() + ms; }
+
 function paint() {
   const k = eff(); const line = !!k && k !== 'WORM';   // the worm is selectable like a line, but it's not on the map
   paths.forEach((p, i) => { const me = TARGETS[i] === k; p.classList.toggle('hot', me); p.classList.toggle('dim', !!k && !me); });
@@ -46,7 +50,7 @@ function paint() {
   } else { panel.classList.remove('show'); document.body.classList.remove('line-selected'); }
 }
 
-function setHover(k) { if (!isReady() || hovered === k) return; hovered = k; paint(); }
+function setHover(k) { if (!isReady() || performance.now() < hoverLockUntil || hovered === k) return; hovered = k; paint(); }
 function dropHover() { if (hovered === null) return; hovered = null; paint(); }   // leaving a line / the route list drops the preview, falling back to the pinned line
 function togglePin(k) {
   if (!isReady()) return;
