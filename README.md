@@ -1,4 +1,4 @@
-# muni · the worm becomes the map
+# muniworm · the worm becomes the map
 
 An interactive artifact about San Francisco's transit logo. Tap in with a Clipper card and the
 Muni "worm" wordmark **draws itself**, then **morphs into the real Muni Metro light-rail map** —
