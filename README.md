@@ -6,7 +6,7 @@ which you can wind, unwind, and explore line by line. Everything is hand-built: 
 projected from real DataSF route data, and every sound is synthesized in the browser (no audio
 files). Full-bleed at any aspect ratio, zero dependencies, no build step.
 
-Live: <https://muniworm.vercel.app/>
+Live: <https://muniworm.probablyalex.com/>
 
 ## Controls
 
