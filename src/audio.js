@@ -51,8 +51,24 @@ function clack(o) {
   src.connect(bp); bp.connect(g); g.connect(master); src.start(t); src.stop(t + dur + .02);
 }
 
-/** Digital reader beep (bip-boop). */
-export const sndTap = () => { blip(2050, { type: 'square', dur: .05, vol: .13 }); blip(2700, { t: .085, type: 'square', dur: .1, vol: .13 }); };
+/* ---------- Clipper fare-gate accept ----------
+   The real gate's high "ding" (~2877 Hz) is a struck, inharmonic tone: a sub-octave partial gives
+   it body, upper partials decay fast, and a gentle low-pass tames the top. The ding is immediately
+   followed by the mechanical click of the gate flap releasing open. */
+const GATE_PARTIALS = [[0.5, 0.55, 1.25], [1.0, 1.00, 1.00], [2.0, 0.14, 0.45], [2.76, 0.07, 0.35]];   // [freq ratio, rel gain, decay scale]
+function gateDing(freq, decay, tame, gain) {
+  const c = audio(); if (!c) return;
+  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = tame; lp.Q.value = 0.7; lp.connect(master);
+  const at = c.currentTime + 0.02;
+  GATE_PARTIALS.forEach(([ratio, amp, decScale]) => {
+    const tEnd = at + decay * decScale;
+    const g = c.createGain(); g.gain.setValueAtTime(gain * amp, at); g.gain.exponentialRampToValueAtTime(.0001, tEnd);   // struck → ring out
+    const osc = c.createOscillator(); osc.type = 'sine'; osc.frequency.value = freq * ratio;
+    osc.connect(g); g.connect(lp); osc.start(at); osc.stop(tEnd + .02);
+  });
+}
+/** Reader accept: the Clipper gate ding. */
+export const sndTap = () => gateDing(2877, 0.55, 6500, .3);
 
 /* ---------- SF Muni "stop requested" chime ----------
    A struck bell, not a held beep: instant attack, immediate exponential ring-out, no sustain.

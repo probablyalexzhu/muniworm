@@ -4,10 +4,38 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>muni · the worm becomes the map</title>
+<meta name="description" content="An interactive piece: San Francisco’s Muni “worm” wordmark draws itself, then morphs into the real Muni Metro light-rail map." />
+<meta name="theme-color" content="#11568f" />
+<link rel="canonical" href="https://muniworm.vercel.app/" />
+
+<!-- favicon (the worm icon) -->
+<link rel="icon" type="image/png" href="muni-worm-icon.png" />
+<link rel="apple-touch-icon" href="muni-worm-icon.png" />
+
+<!-- link preview (Open Graph — iMessage, Discord, Slack, Facebook) -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="muni" />
+<meta property="og:title" content="muni · the worm becomes the map" />
+<meta property="og:description" content="San Francisco’s Muni “worm” wordmark draws itself, then morphs into the real Muni Metro light-rail map. Tap in and explore." />
+<meta property="og:url" content="https://muniworm.vercel.app/" />
+<meta property="og:image" content="https://muniworm.vercel.app/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="The Muni “worm” logo morphed into a stylized San Francisco Muni Metro light-rail map." />
+
+<!-- link preview (Twitter / X) -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="muni · the worm becomes the map" />
+<meta name="twitter:description" content="San Francisco’s Muni “worm” wordmark draws itself, then morphs into the real Muni Metro light-rail map. Tap in and explore." />
+<meta name="twitter:image" content="https://muniworm.vercel.app/og-image.png" />
+
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="bg"></div>
+
+  <!-- byline: quiet bottom-left credit, shown on the intro only (fades on tap-in) -->
+  <div class="credit" id="credit">by <a href="https://probablyalex.com" target="_blank" rel="noopener noreferrer">Alex Zhu</a> · <a href="https://github.com/probablyalexzhu/muniworm" target="_blank" rel="noopener noreferrer">GitHub</a></div>
 
   <!-- quiet top-right controls: keyboard help (?) + mute, outline icons -->
   <div class="topright">
