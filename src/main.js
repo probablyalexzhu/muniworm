@@ -10,6 +10,8 @@ import { landG, capsG, legendEl, showWinder } from './scene.js';
 import './controls.js';   // arrow keys + winder
 import './explorer.js';   // line hover / pin + keyboard
 import './card.js';       // Clipper card drag → tap in
+import './sound-toggle.js';   // mute button
+import './help.js';           // ? key legend
 
 const qs = new URLSearchParams(location.search);
 if (qs.has('t')) {

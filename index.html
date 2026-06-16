@@ -8,6 +8,37 @@
 </head>
 <body>
   <div class="bg"></div>
+
+  <!-- quiet top-right controls: keyboard help (?) + mute, outline icons -->
+  <div class="topright">
+    <button class="iconbtn mute" id="mute" type="button" aria-pressed="false" aria-label="Mute sound">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path class="spk" d="M4 9 H7.5 L12.5 5 V19 L7.5 15 H4 Z"/>
+        <path class="wave" d="M15.5 9.2 A4.2 4.2 0 0 1 15.5 14.8"/>
+        <path class="wave" d="M18 6.7 A8 8 0 0 1 18 17.3"/>
+        <line class="slash" x1="3.5" y1="3.5" x2="20.5" y2="20.5"/>
+      </svg>
+    </button>
+    <button class="iconbtn help" id="help" type="button" aria-expanded="false" aria-controls="keys" aria-label="Keyboard shortcuts">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/>
+        <text class="qm" x="12" y="16.4">?</text>
+      </svg>
+    </button>
+  </div>
+
+  <!-- brief key legend, toggled by the ? button -->
+  <div class="keys" id="keys" aria-label="Keyboard shortcuts">
+    <h2 class="keys-title">Controls</h2>
+    <dl class="keys-list">
+      <dt><kbd>←</kbd><kbd>→</kbd></dt><dd>Wind / unwind the morph</dd>
+      <dt><kbd>Home</kbd><kbd>End</kbd></dt><dd>Jump to the worm / the map</dd>
+      <dt><kbd>J</kbd><span class="rng">–</span><kbd>T</kbd></dt><dd>Focus a line’s story</dd>
+      <dt><kbd>I</kbd></dt><dd>The worm’s story</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Clear selection</dd>
+    </dl>
+  </div>
+
   <main>
     <!-- intro framing: what this is, shown only before you tap in (fades on body.playing) -->
     <div class="intro-title" id="introTitle" aria-hidden="true">
@@ -83,7 +114,6 @@
       <div class="li-termini"><span class="li-end li-from"></span><span class="li-arrow">→</span><span class="li-end li-to"></span></div>
     </div>
   </aside>
-  <div class="li-hint" id="lihint">Hover a line · or press J K L M N T</div>
 
 <script type="module" src="src/main.js"></script>
 </body>

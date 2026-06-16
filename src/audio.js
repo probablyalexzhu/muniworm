@@ -4,15 +4,32 @@
  */
 
 let actx = null;
+let master = null;          // every sound routes through here, so one gain mutes the whole piece
+let muted = false;
+try { muted = localStorage.getItem('muni-muted') === '1'; } catch (e) { /* storage blocked */ }
 
-/** Lazily create / resume the shared AudioContext. Returns null if Web Audio is unavailable. */
+/** Lazily create / resume the shared AudioContext + master gain. Returns null if Web Audio is unavailable. */
 export function audio() {
   try {
-    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!actx) {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      master = actx.createGain();
+      master.gain.value = muted ? 0 : 1;
+      master.connect(actx.destination);
+    }
     if (actx.state === 'suspended') actx.resume();
   } catch (e) { /* no audio available */ }
   return actx;
 }
+
+/** Mute / unmute everything; the choice persists across visits. */
+export function setMuted(m) {
+  muted = !!m;
+  try { localStorage.setItem('muni-muted', muted ? '1' : '0'); } catch (e) { /* storage blocked */ }
+  if (master && actx) master.gain.setTargetAtTime(muted ? 0 : 1, actx.currentTime, 0.015);   // short ramp avoids a click
+}
+/** Current mute state (read on load to set the button's initial look). */
+export function isMuted() { return muted; }
 
 /** A short tonal blip with optional pitch slide. */
 function blip(freq, o) {
@@ -20,7 +37,7 @@ function blip(freq, o) {
   const osc = c.createOscillator(), g = c.createGain(); osc.type = o.type || 'sine'; osc.frequency.setValueAtTime(freq, t);
   if (o.slide) osc.frequency.exponentialRampToValueAtTime(o.slide, t + dur);
   const v = o.vol == null ? .2 : o.vol; g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(v, t + .006); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
-  osc.connect(g); g.connect(c.destination); osc.start(t); osc.stop(t + dur + .03);
+  osc.connect(g); g.connect(master); osc.start(t); osc.stop(t + dur + .03);
 }
 
 /** A short decaying noise burst through a bandpass → a dry, plasticky "tick/tap" (card handling). */
@@ -31,7 +48,7 @@ function clack(o) {
   const src = c.createBufferSource(); src.buffer = buf;
   const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = o.freq || 1100; bp.Q.value = o.q || 0.7;
   const g = c.createGain(); g.gain.value = o.vol == null ? .16 : o.vol;
-  src.connect(bp); bp.connect(g); g.connect(c.destination); src.start(t); src.stop(t + dur + .02);
+  src.connect(bp); bp.connect(g); g.connect(master); src.start(t); src.stop(t + dur + .02);
 }
 
 /** Digital reader beep (bip-boop). */
@@ -53,7 +70,7 @@ function ding(dest, at, freq, decay, gain) {
 }
 export const sndDing = () => {
   const c = audio(); if (!c) return;
-  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 9000; lp.Q.value = .7; lp.connect(c.destination);
+  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 9000; lp.Q.value = .7; lp.connect(master);
   const freq = 1172, gain = .4, t0 = c.currentTime + .02;
   ding(lp, t0, freq, .35, gain);            // short strike
   ding(lp, t0 + .26, freq, .90, gain);      // longer ringing strike
@@ -76,7 +93,7 @@ export function sndInkFlood() {
   const osc = c.createOscillator(); osc.type = 'triangle'; osc.frequency.setValueAtTime(90, t); osc.frequency.exponentialRampToValueAtTime(170, t + .5);
   const g = c.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(.2, t + .12); g.gain.exponentialRampToValueAtTime(.0001, t + .7);
   const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 520;
-  osc.connect(g); g.connect(lp); lp.connect(c.destination); osc.start(t); osc.stop(t + .75);
+  osc.connect(g); g.connect(lp); lp.connect(master); osc.start(t); osc.stop(t + .75);
 }
 
 /** A soft "tick" as the pen catches each glyph of the worm outline while drawing. */
