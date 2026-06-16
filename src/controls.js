@@ -23,7 +23,6 @@ function goTo(target, dur) {
 }
 
 function stepStage(dir, fast) {
-  document.body.classList.add('stepped');                        // user has wound at least once → retire the coach tip
   if (!getCaseShown()) { if (dir > 0) goTo(1, 1500); return; }   // from the intro: right zooms in AND draws the worm; left does nothing
   const base = isAnimating() ? getAim() : getPos();             // mid-flight: step off the in-flight target so mashing/holding keeps advancing
   // Fold back to the intro only once we've ACTUALLY reached the worm — gate on real POS, not the in-flight aim.

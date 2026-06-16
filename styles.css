@@ -126,7 +126,7 @@
     border:2px solid var(--bus-orange); pointer-events:none; display:none; }
   body.winder-ready .help::after{ display:block; animation:helpPing 2.2s ease-out infinite; }
   @keyframes helpPing{ 0%{ transform:scale(.55); opacity:.85 } 70%{ opacity:0 } 100%{ transform:scale(1.5); opacity:0 } }
-  .help.seen::after, body.stepped .help::after{ display:none; }   /* menu opened, or user found controls by winding */
+  body.winder-ready .help.seen::after{ display:none; }   /* retired on any control key (or a click on ? itself); must out-specify the winder-ready rule above */
   @media (prefers-reduced-motion:reduce){ .help::after{ display:none; } }
   .mute .slash{ display:none; }
   .mute.muted .wave{ display:none; }       /* muted: drop the sound waves, show the slash */
