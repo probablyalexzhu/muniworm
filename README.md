@@ -8,6 +8,8 @@ files). Full-bleed at any aspect ratio, zero dependencies, no build step.
 
 Live: <https://muniworm.probablyalex.com/>
 
+https://github.com/user-attachments/assets/45022644-a0a5-4c77-98cd-2809bda20f3e
+
 ## Controls
 
 | Key | Action |
