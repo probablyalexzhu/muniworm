@@ -62,7 +62,7 @@
   #caps.show{ opacity:1; }
   #worm path{fill:var(--worm)}
   #worm path:nth-child(2){fill:var(--worm-i)}   /* the "i" bar is a hair more crimson in the original logo */
-  #lines, #stations{filter:drop-shadow(0 1.5px 1.5px rgba(70,40,22,.32))}
+  #lines, #linesTop, #stations{filter:drop-shadow(0 1.5px 1.5px rgba(70,40,22,.32))}
   #stations .hub{fill:var(--bg);stroke:var(--ink)}
 
   /* line legend — real-transit-map circle markers, overlaid on the map (left) */
@@ -119,6 +119,15 @@
     fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   .help .qm{ stroke:none; fill:currentColor; text-anchor:middle;
     font:700 12px/1 "Helvetica Neue",Helvetica,Arial,sans-serif; }
+  /* "look here" ping on the ? — a radar ring in the accent orange. Only after the morph completes
+     (winder-ready, when the caps/legend fade in); retires once the menu's opened or controls are found. */
+  .help{ position:relative; }
+  .help::after{ content:""; position:absolute; inset:4px; border-radius:50%;
+    border:2px solid var(--bus-orange); pointer-events:none; display:none; }
+  body.winder-ready .help::after{ display:block; animation:helpPing 2.2s ease-out infinite; }
+  @keyframes helpPing{ 0%{ transform:scale(.55); opacity:.85 } 70%{ opacity:0 } 100%{ transform:scale(1.5); opacity:0 } }
+  .help.seen::after, body.stepped .help::after{ display:none; }   /* menu opened, or user found controls by winding */
+  @media (prefers-reduced-motion:reduce){ .help::after{ display:none; } }
   .mute .slash{ display:none; }
   .mute.muted .wave{ display:none; }       /* muted: drop the sound waves, show the slash */
   .mute.muted .slash{ display:inline; }
@@ -230,12 +239,12 @@
 
   /* ============ line explorer: focus a single line, dim the rest, show its story ============ */
   /* lines/legend only respond on the finished map */
-  #lines path{ transition:opacity .32s ease, filter .32s ease; pointer-events:none; }   /* visible lines are display-only; hit-testing lives on #hit */
+  #lines path, #linesTop path{ transition:opacity .32s ease, filter .32s ease; pointer-events:none; }   /* visible lines are display-only; hit-testing lives on #hit. #linesTop holds the lifted (focused) line */
   /* transparent hit layer, pinned on top: wide stroke = forgiving target; never reordered, so hover is stable over overlaps */
   #hit path.lnhit{ fill:transparent; stroke:transparent; stroke-width:17px; stroke-linejoin:round; pointer-events:none; }
   body.map-ready #hit path.lnhit{ pointer-events:all; cursor:pointer; }    /* hit the ribbon fill OR the padded band */
-  #lines path.dim{ opacity:.1; }                                   /* the other routes recede */
-  #lines path.hot{ filter:brightness(1.04) drop-shadow(0 0 5px rgba(0,0,0,.28)); }
+  #lines path.dim, #linesTop path.dim{ opacity:.1; }                                   /* the other routes recede */
+  #lines path.hot, #linesTop path.hot{ filter:brightness(1.04) drop-shadow(0 0 5px rgba(0,0,0,.28)); }
   #land.show.dim{ opacity:.2; transition:opacity .3s ease; } #caps.show.dim{ opacity:.22; transition:opacity .3s ease; }   /* darken landform + end caps so the chosen line pops (snappy dim-in; gentle fade back) */
   body.map-ready .legend{ pointer-events:auto; }   /* contiguous hit region: pointerleave fires only when leaving the whole list, and gaps between chips don't drop the focus */
   body.map-ready .chip{ pointer-events:auto; cursor:pointer; }
@@ -282,4 +291,37 @@
     font-size:11px; letter-spacing:.04em; font-weight:700; color:#efe9dd; }
   .li-end{ white-space:nowrap; }
   .li-arrow{ flex:0 0 auto; color:var(--c); font-weight:800; font-size:14px; transform:translateY(-1px); }
+
+  /* ============ overhead LED "STOP REQUEST" marquee ============
+     Lights up when you wind right at the end of the line — the in-vehicle "stop requested" sign.
+     Two aligned amber dot grids: a dim one across the whole housing (unlit LEDs) and a bright one
+     clipped to the letters (lit LEDs). Panel padding is a multiple of the 5px dot cell so the two
+     grids stay in phase, reading as one continuous matrix with some dots lit. */
+  .stopsign{ position:fixed; top:clamp(12px,3.4vh,32px); left:50%; z-index:45; pointer-events:none;
+    padding:15px 30px;                                   /* multiples of the 5px cell → the two grids align */
+    border-radius:13px;                                  /* match the story panel / keys popover */
+    /* unlit-LED dot grid over the same warm-dark card surface the other panels use */
+    background-image:radial-gradient(circle, rgba(255,168,46,.13) 1.2px, transparent 1.7px),
+                     linear-gradient(157deg,#26201a 0%,#1a1510 52%,#120e0a 100%);
+    background-size:5px 5px, auto;
+    box-shadow:0 34px 70px -22px rgba(0,0,0,.78), inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(0,0,0,.5);   /* shared card shadow */
+    opacity:0; transform:translateX(-50%) translateY(-14px);
+    transition:opacity .35s ease, transform .5s cubic-bezier(.2,.9,.3,1); }
+  .stopsign.show{ opacity:1; transform:translateX(-50%) translateY(0);
+    box-shadow:0 34px 70px -22px rgba(0,0,0,.78), inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(0,0,0,.5), 0 0 36px rgba(255,150,30,.28); }   /* + amber bloom when lit */
+  .stoptext{ display:block; white-space:nowrap;
+    font:900 clamp(26px,4.4vw,44px)/1 "Arial Black","Helvetica Neue",Helvetica,Arial,sans-serif;
+    letter-spacing:.08em; text-transform:uppercase;
+    background-image:radial-gradient(circle, #ffb12c 1.2px, transparent 1.7px);   /* lit LEDs, same phase as the housing grid */
+    background-size:5px 5px;
+    -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; color:transparent;
+    filter:drop-shadow(0 0 2px rgba(255,150,20,.95)) drop-shadow(0 0 7px rgba(255,120,0,.5)); }
+  .stopsign.show .stoptext{ animation:ledwarm .42s ease-out both; }   /* LED warm-up flicker on switch-on */
+  @keyframes ledwarm{
+    0%{filter:brightness(.15) drop-shadow(0 0 1px rgba(255,150,20,.4))}
+    9%{filter:brightness(1.7)} 15%{filter:brightness(.4)} 25%{filter:brightness(1.5)}
+    34%{filter:brightness(.75)} 46%{filter:brightness(1.2)}
+    100%{filter:brightness(1) drop-shadow(0 0 2px rgba(255,150,20,.95)) drop-shadow(0 0 7px rgba(255,120,0,.5))} }
+  @media (prefers-reduced-motion:reduce){ .stopsign.show .stoptext{ animation:none; } }
 

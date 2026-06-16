@@ -5,7 +5,7 @@
  */
 
 import { TARGETS, RANK, META, INFO, WORM_BLUE, WORM_TEXT } from './data.js';
-import { paths, hitPaths, linesG, capsG, landG, legendEl, legendChips, restoreZ, pressKey } from './scene.js';
+import { paths, hitPaths, capsG, landG, legendEl, legendChips, liftLine, clearLifts, pressKey } from './scene.js';
 import { wormG } from './morph.js';
 import { sndLine } from './audio.js';
 
@@ -16,6 +16,8 @@ const piBadge = panel.querySelector('.li-badge'), piName = panel.querySelector('
   piFrom = panel.querySelector('.li-from'), piTo = panel.querySelector('.li-to');
 
 let pinned = null, hovered = null;   // pinned = typed/clicked (sticky); hovered = pointer preview. Hover wins while present, else falls back to the pinned line.
+let dropTimer = null;                // pending hover-clear; held briefly so hopping between lines doesn't flash the map
+const HOVER_LINGER = 180;            // ms the focus lingers after the pointer leaves a line
 const isReady = () => document.body.classList.contains('map-ready');
 const eff = () => hovered || pinned;
 
@@ -26,8 +28,7 @@ export function suppressHover(ms) { hoverLockUntil = performance.now() + ms; }
 function paint() {
   const k = eff(); const line = !!k && k !== 'WORM';   // the worm is selectable like a line, but it's not on the map
   paths.forEach((p, i) => { const me = TARGETS[i] === k; p.classList.toggle('hot', me); p.classList.toggle('dim', !!k && !me); });
-  restoreZ(); if (line) linesG.appendChild(paths[TARGETS.indexOf(k)]);   // lift the chosen line above the rest so it never hides under an overlap
-  if (line) capsG.after(linesG); else capsG.before(linesG);             // while a line is focused, raise #lines above #caps so the chosen line sits over the end caps
+  if (line) liftLine(k); else clearLifts();   // raise ONLY the focused line (above the caps); dimmed lines stay put so their opacity fade isn't cancelled by a DOM move
   landG.classList.toggle('dim', !!k); capsG.classList.toggle('dim', !!k);
   legendChips.forEach(c => { c.el.classList.toggle('cur', c.key === k); c.el.classList.toggle('mut', !!k && c.key !== k); });
   panel.classList.toggle('worm', k === 'WORM');
@@ -50,8 +51,17 @@ function paint() {
   } else { panel.classList.remove('show'); document.body.classList.remove('line-selected'); }
 }
 
-function setHover(k) { if (!isReady() || performance.now() < hoverLockUntil || hovered === k) return; hovered = k; paint(); }
-function dropHover() { if (hovered === null) return; hovered = null; paint(); }   // leaving a line / the route list drops the preview, falling back to the pinned line
+function setHover(k) {
+  clearTimeout(dropTimer); dropTimer = null;   // entering a line cancels any pending clear → seamless line-to-line hops
+  if (!isReady() || performance.now() < hoverLockUntil || hovered === k) return;
+  hovered = k; sndLine(k === 'WORM' ? 6 : RANK[k], 1); paint();   // ring the line's note on hover (once per line entered), same chime as a pin
+}
+// leaving a line / the route list drops the preview — but on a short timer, so darting to a neighbouring
+// line cancels it first and the map never flashes back to its un-dimmed state in between.
+function dropHover() {
+  if (hovered === null || dropTimer) return;
+  dropTimer = setTimeout(() => { dropTimer = null; hovered = null; paint(); }, HOVER_LINGER);
+}
 function togglePin(k) {
   if (!isReady()) return;
   sndLine(k === 'WORM' ? 6 : RANK[k], 1);              // ring the line's note
@@ -59,7 +69,11 @@ function togglePin(k) {
   pinned = pinned === k ? null : k; paint();           // type a letter or click a line/chip to lock it; same again releases it
 }
 /** Drop any pinned/hovered selection (called by render when we leave the finished map). */
-export function clearSelection() { if (pinned === null && hovered === null) return; pinned = null; hovered = null; paint(); }
+export function clearSelection() {
+  clearTimeout(dropTimer); dropTimer = null;   // cancel any lingering hover-clear so it can't repaint after we've left
+  if (pinned === null && hovered === null) return;
+  pinned = null; hovered = null; paint();
+}
 
 // hover previews, click/tap pins. Events live on the fixed hit layer (not the reordered visible lines),
 // and the legend chip is a bigger, easier target than the thin ribbon.

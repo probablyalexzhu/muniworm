@@ -20,6 +20,34 @@ Z_ORDER.forEach(k => linesG.appendChild(paths[TARGETS.indexOf(k)]));
 /** Restore the designed stacking order (red under, yellow over). */
 export function restoreZ() { Z_ORDER.forEach(k => linesG.appendChild(paths[TARGETS.indexOf(k)])); }
 
+/* ---------- focus lift ----------
+   SVG z-order IS DOM order, so raising the focused line means re-appending its node — and re-inserting a
+   node CANCELS any CSS transition running on it (it snaps to the target value). To keep the dimmed lines'
+   opacity fade smooth, we move ONLY the focused line, into #linesTop (a group above the caps), and never
+   touch the dimmed lines. Lifted lines are reclaimed to their designed slot in #lines when focus clears. */
+const linesTopG = document.createElementNS(NS, 'g'); linesTopG.setAttribute('id', 'linesTop');
+const lifted = new Set();
+/** Raise line `k` above everything (no-op if already lifted, or for the worm / no selection). */
+export function liftLine(k) {
+  if (!k || k === 'WORM' || lifted.has(k)) return;
+  if (!linesTopG.parentNode) capsG.after(linesTopG);   // attach lazily — capsG exists by now
+  linesTopG.appendChild(paths[TARGETS.indexOf(k)]); lifted.add(k);   // appended last → above any earlier-lifted line
+}
+/** Return every lifted line to its designed Z_ORDER slot in #lines (others are left untouched, so their fade survives). */
+export function clearLifts() {
+  if (!lifted.size) return;
+  for (const k of Z_ORDER) {                            // bottom→top: by the time we place k, lower-Z lines already sit correctly
+    if (!lifted.has(k)) continue;
+    const zi = Z_ORDER.indexOf(k); let before = null;
+    for (let i = zi + 1; i < Z_ORDER.length; i++) {     // insert before the next-higher line already present in #lines
+      const cand = paths[TARGETS.indexOf(Z_ORDER[i])];
+      if (cand.parentNode === linesG) { before = cand; break; }
+    }
+    linesG.insertBefore(paths[TARGETS.indexOf(k)], before);
+  }
+  lifted.clear();
+}
+
 /* ---------- hit layer ----------
    Invisible, pinned on top and NEVER reordered. Pointer events live here, so re-stacking the
    visible lines (for z) under the cursor can't desync hover/leave over overlapping ribbons. The
@@ -79,3 +107,14 @@ export const windNext = document.getElementById('windNext');
 export function pressKey(el) { el.classList.remove('press'); void el.offsetWidth; el.classList.add('press'); }
 /** Reveal the arrow buttons (once the first morph finishes, or the moment the user reaches for the arrows). */
 export function showWinder() { document.body.classList.add('winder-ready'); }
+
+/* ---------- overhead "STOP REQUEST" LED marquee ---------- */
+const stopSign = document.getElementById('stopsign');
+let stopTimer = null;
+/** Light the marquee (with its LED warm-up flicker), then fade it out. Re-triggers cleanly if mashed. */
+export function flashStopSign() {
+  clearTimeout(stopTimer);
+  stopSign.classList.remove('show'); void stopSign.offsetWidth;   // reflow → restart the flicker on a fresh press
+  stopSign.classList.add('show');
+  stopTimer = setTimeout(() => stopSign.classList.remove('show'), 1400);
+}

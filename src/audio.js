@@ -100,7 +100,7 @@ export const sndDing = () => {
    Each line owns one note of a rising major-pentatonic scale, in route order J K L M N T (the worm
    caps it with E6). It sounds the instant the line peels out of the worm; wind forward and the scale
    climbs, unwind and the same notes fire in reverse. */
-const LINE_SCALE = [523.25, 587.33, 659.25, 783.99, 987.77, 1046.50, 1318.51];   // C5 D5 E5 G5 B5 C6 E6
+const LINE_SCALE = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50, 1318.51];   // C5 D5 E5 G5 A5 C6 (C major pentatonic) + E6 worm
 export function sndLine(rank, dir) {
   const f = LINE_SCALE[rank]; if (f == null) return;
   if (dir >= 0) blip(f, { type: 'sine', dur: .42, vol: .17 });                  // appear: a clean bell at the line's pitch

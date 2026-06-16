@@ -10,6 +10,7 @@ const isOpen = () => panel.classList.contains('open');
 function setOpen(open) {
   panel.classList.toggle('open', open);
   btn.setAttribute('aria-expanded', String(open));
+  if (open) btn.classList.add('seen');   // first open retires the attention ping
 }
 
 btn.addEventListener('click', e => { e.stopPropagation(); setOpen(!isOpen()); });

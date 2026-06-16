@@ -16,9 +16,24 @@ function tapAccept() { audio(); reader.classList.add('tap'); sndTap(); setTimeou
 
 let homeOff = { x: 0, y: 0 };   // the card's persistent offset from its CSS home — it stays wherever you drop it
 /** Snap the card back to its CSS home (called when the experience rewinds to the intro). */
-export function resetCard() { homeOff = { x: 0, y: 0 }; card.style.transition = ''; card.style.transform = 'translate(-50%,-50%)'; card.style.transformOrigin = ''; card.classList.remove('placed'); }
+export function resetCard() { clearHold(); homeOff = { x: 0, y: 0 }; card.style.transition = ''; card.style.transform = 'translate(-50%,-50%)'; card.style.transformOrigin = ''; card.classList.remove('placed'); }
 
-let drag = null, physReq = null;
+let drag = null, physReq = null, holdTimer = null;   // holdTimer: drag the card onto the reader and hold ~1s → taps in without releasing
+const HOLD_MS = 1000;
+function clearHold() { if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; } }
+
+/** Settle the card flat onto the reader (a little human jitter) and start the tap-in sequence. Shared by the drop-on-reader and hold-over-reader paths. */
+function landOnReader(c) {
+  const jx = (Math.random() * 2 - 1) * c.rad * 0.26, jy = (Math.random() * 2 - 1) * c.rad * 0.26, jr = (Math.random() * 2 - 1) * 7;
+  const tx = c.x + jx - drag.homeCx, ty = c.y + jy - drag.homeCy; drag = null;   // offset from home so it lands centred on the reader
+  clearHold(); if (physReq) { cancelAnimationFrame(physReq); physReq = null; }
+  card.classList.remove('dragging'); reader.classList.remove('armed');
+  card.classList.add('placed');   // stop the "pick me up" glow once it's on the reader
+  card.style.transition = 'transform .24s cubic-bezier(.3,.85,.3,1)';            // "fall" flat onto the reader (glide + settle slightly askew)
+  card.style.transform = `translate(-50%,-50%) translate(${tx}px,${ty}px) rotate(${jr.toFixed(2)}deg)`;
+  tapAccept();
+  setTimeout(startPlay, 1000);                                                   // hold a beat on the reader, then the worm appears + morph
+}
 const PULL = 0.055, DAMP = 1.8, REST = 2.2;   // PULL=how hard motion rotates it · DAMP=settle · REST=return-upright (loose = flickable)
 function phys() {
   if (!drag) { physReq = null; return; }
@@ -72,22 +87,23 @@ card.addEventListener('pointerdown', e => {
 });
 card.addEventListener('pointermove', e => {
   if (!drag || !drag.held) return; drag.px = e.clientX; drag.py = e.clientY;
-  const c = readerC(); reader.classList.toggle('armed', Math.hypot(drag.px - c.x, drag.py - c.y) < c.rad * 1.15);
+  const c = readerC(), over = Math.hypot(drag.px - c.x, drag.py - c.y) < c.rad * 1.15;
+  reader.classList.toggle('armed', over);
+  if (over && !holdTimer) holdTimer = setTimeout(holdAccept, HOLD_MS);   // entered the reader → start the hold countdown
+  else if (!over) clearHold();                                          // wandered off → cancel it (re-entering restarts the clock)
 });
+/** Fired when the card has rested over the reader for HOLD_MS while still held — tap in without a release. */
+function holdAccept() {
+  holdTimer = null;
+  if (!drag || !drag.held) return;                             // released or gone in the meantime
+  const c = readerC();
+  if (Math.hypot(drag.px - c.x, drag.py - c.y) >= c.rad * 1.15) return;   // drifted off the reader just as it fired
+  landOnReader(c);
+}
 card.addEventListener('pointerup', e => {
-  if (!drag) return;
+  if (!drag) return; clearHold();
   const c = readerC(), hit = Math.hypot(drag.px - c.x, drag.py - c.y) < c.rad * 1.2;
-  card.classList.remove('dragging'); reader.classList.remove('armed');
-  if (hit) {
-    // land somewhere ON the reader, not dead-centre — a little human jitter in position + tilt
-    const jx = (Math.random() * 2 - 1) * c.rad * 0.26, jy = (Math.random() * 2 - 1) * c.rad * 0.26, jr = (Math.random() * 2 - 1) * 7;
-    const tx = c.x + jx - drag.homeCx, ty = c.y + jy - drag.homeCy; drag = null;   // offset from home so it lands centred on the reader
-    if (physReq) { cancelAnimationFrame(physReq); physReq = null; }
-    card.style.transition = 'transform .24s cubic-bezier(.3,.85,.3,1)';   // "fall" flat onto the reader (glide + settle slightly askew)
-    card.style.transform = `translate(-50%,-50%) translate(${tx}px,${ty}px) rotate(${jr.toFixed(2)}deg)`;
-    card.classList.add('placed');   // stop the "pick me up" glow once it's on the reader
-    tapAccept();
-    setTimeout(startPlay, 1000);                                // hold a beat on the reader, then the worm appears + morph
-  } else { drag.held = false; sndPutdown(); }                   // dropped off the reader: soft put-down, then the flick carries home via physics
+  if (hit) { landOnReader(c); }                                // dropped on the reader: land it flat and tap in
+  else { card.classList.remove('dragging'); reader.classList.remove('armed'); drag.held = false; sndPutdown(); }   // dropped off: soft put-down, then the flick carries home via physics
 });
 card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tapAccept(); setTimeout(startPlay, 900); } });  // a11y fallback

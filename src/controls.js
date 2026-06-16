@@ -7,7 +7,7 @@
 import { STEP, SPAN } from './config.js';
 import { animateTo, getPos, getAim, isAnimating } from './render.js';
 import { getCaseShown, revealCase, exitToIntro } from './stage.js';
-import { landG, capsG, legendEl, windPrev, windNext, pressKey, showWinder } from './scene.js';
+import { landG, capsG, legendEl, windPrev, windNext, pressKey, showWinder, flashStopSign } from './scene.js';
 import { audio, sndDing } from './audio.js';
 
 // stops in master-POS space: 1 = drawn worm · then one stop per line peeling off · 2 = finished map
@@ -23,6 +23,7 @@ function goTo(target, dur) {
 }
 
 function stepStage(dir, fast) {
+  document.body.classList.add('stepped');                        // user has wound at least once → retire the coach tip
   if (!getCaseShown()) { if (dir > 0) goTo(1, 1500); return; }   // from the intro: right zooms in AND draws the worm; left does nothing
   const base = isAnimating() ? getAim() : getPos();             // mid-flight: step off the in-flight target so mashing/holding keeps advancing
   // Fold back to the intro only once we've ACTUALLY reached the worm — gate on real POS, not the in-flight aim.
@@ -35,7 +36,7 @@ function stepStage(dir, fast) {
     if (target == null) {                                       // nothing further to wind toward
       if (getPos() >= 2 - 1e-3) {                               // already AT the finished map: pressing right does nothing on screen
         const now = performance.now();
-        if (now - lastDing > 900) { lastDing = now; sndDing(); } // ring the Muni stop-request chime (debounced so a held key can't stack it)
+        if (now - lastDing > 900) { lastDing = now; sndDing(); flashStopSign(); } // ring the chime + light the "STOP REQUEST" marquee (debounced so a held key can't stack them)
         return;
       }
       target = 2;                                               // still winding the final segment in → let it finish (an on-screen action, no chime)
