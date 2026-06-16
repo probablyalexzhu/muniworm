@@ -49,3 +49,8 @@ src/
 Dependencies flow one way: `config`/`data`/`geometry` → `morph` → `scene` → feature modules →
 `main`. (`stage` and `card` reference each other, but only via runtime event handlers, so the
 ES-module cycle is safe.)
+
+## License
+
+[MIT](LICENSE) © Alex Zhu. The Muni "worm" wordmark is a trademark of the SFMTA; it appears here
+for non-commercial, illustrative purposes.

@@ -103,12 +103,18 @@
   @keyframes winderpress{ 0%{transform:scale(1)} 34%{transform:scale(.8); filter:brightness(.88)} 100%{transform:scale(1)} }
 
   /* ---- top-right controls: help (?) + mute, quiet outline icons ---- */
-  .topright{ position:fixed; top:clamp(12px,2.2vh,22px); right:clamp(12px,2vw,24px); z-index:60;
-    display:flex; align-items:center; gap:clamp(2px,.6vw,8px); }
+  .topright{ position:fixed; top:clamp(8px,2.4%,26px); right:clamp(8px,1.8%,22px); z-index:60;
+    display:flex; align-items:center; gap:clamp(2px,.6vw,8px); transition:opacity .5s ease; }
+  /* clear the chrome through the draw + first morph (like the winder) so nothing competes with the
+     reveal; the cluster fades back in with the winder once the map settles */
+  body.playing:not(.winder-ready) .topright{ opacity:0; pointer-events:none; }
   .iconbtn{ width:38px; height:38px; padding:8px; border:0; background:none; cursor:pointer;
-    color:rgba(243,240,234,.42); -webkit-tap-highlight-color:transparent;
-    display:flex; align-items:center; justify-content:center; transition:color .2s ease; }
-  .iconbtn:hover, .iconbtn:focus-visible{ color:rgba(243,240,234,.9); outline:none; }
+    color:rgba(247,244,238,.66); -webkit-tap-highlight-color:transparent;
+    display:flex; align-items:center; justify-content:center; transition:color .3s ease; }
+  .iconbtn:hover, .iconbtn:focus-visible{ color:#fff; outline:none; }
+  /* the map / morph screen behind the cluster is light → switch to dark ink so the icons stay legible */
+  body.playing .iconbtn{ color:rgba(38,32,24,.5); }
+  body.playing .iconbtn:hover, body.playing .iconbtn:focus-visible{ color:rgba(38,32,24,.92); }
   .iconbtn svg{ width:100%; height:100%; display:block;
     fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   .help .qm{ stroke:none; fill:currentColor; text-anchor:middle;
@@ -116,10 +122,16 @@
   .mute .slash{ display:none; }
   .mute.muted .wave{ display:none; }       /* muted: drop the sound waves, show the slash */
   .mute.muted .slash{ display:inline; }
-  .help[aria-expanded="true"]{ color:rgba(243,240,234,.9); }
+  .share svg{ stroke-width:2.1; }          /* compensate the larger viewBox so the line weight matches the others */
+  .share .ic-check{ display:none; }
+  .share.copied .ic-link{ display:none; }  /* on copy: swap the link icon for a check */
+  .share.copied .ic-check{ display:inline; }
+  .share.copied{ color:#7fae5a; }          /* brief confirming green */
+  .help[aria-expanded="true"]{ color:#fff; }
+  body.playing .help[aria-expanded="true"]{ color:rgba(38,32,24,.92); }
 
   /* ---- brief key legend popover (toggled by ?) ---- */
-  .keys{ position:fixed; top:calc(clamp(12px,2.2vh,22px) + 48px); right:clamp(12px,2vw,24px); z-index:59;
+  .keys{ position:fixed; top:calc(clamp(8px,2.4%,26px) + 46px); right:clamp(8px,1.8%,22px); z-index:59;
     width:min(264px,82vw); padding:15px 17px; border-radius:13px;
     background:linear-gradient(157deg,#26201a 0%,#1a1510 52%,#120e0a 100%);   /* match the story panel */
     box-shadow:0 34px 70px -22px rgba(0,0,0,.78), inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(0,0,0,.5);
@@ -217,7 +229,7 @@
 
   /* the story placard — a fragment of the map itself: a route spine with two terminus markers
      brackets a dark Muni-platform plate, colored to the line. Fixed (not scaled with the map). */
-  .lineinfo{ --c:#888; position:fixed; right:clamp(16px,3.5vw,52px); bottom:clamp(18px,6vh,58px); z-index:40;
+  .lineinfo{ --c:#888; position:fixed; right:clamp(8px,1.8%,22px); bottom:clamp(10px,3vh,28px); z-index:40;
     width:min(404px,85vw); min-height:272px; padding:22px 26px 22px 20px; border-radius:13px;
     display:flex; gap:19px; align-items:stretch;
     background:linear-gradient(157deg,#26201a 0%,#1a1510 52%,#120e0a 100%); color:#f4efe5;

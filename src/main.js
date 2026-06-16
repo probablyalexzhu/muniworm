@@ -12,6 +12,7 @@ import './explorer.js';   // line hover / pin + keyboard
 import './card.js';       // Clipper card drag → tap in
 import './sound-toggle.js';   // mute button
 import './help.js';           // ? key legend
+import './share.js';          // copy a link to the current view
 
 const qs = new URLSearchParams(location.search);
 if (qs.has('t')) {
