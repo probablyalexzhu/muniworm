@@ -29,6 +29,11 @@
 <meta name="twitter:description" content="San Francisco’s Muni “worm” wordmark draws itself, then morphs into the real Muni Metro light-rail map. Tap in and explore." />
 <meta name="twitter:image" content="https://muniworm.vercel.app/og-image.png" />
 
+<!-- preload the intro art so it paints immediately (CSS background-images are otherwise only fetched
+     after the stylesheet parses + the elements lay out → the visible half-second pop-in) -->
+<link rel="preload" as="image" href="clipper-reader.webp" fetchpriority="high" />
+<link rel="preload" as="image" href="clipper-card.png" fetchpriority="high" />
+
 <link rel="stylesheet" href="styles.css" />
 
 <!-- Vercel Web Analytics (no build step — the script-tag form of @vercel/analytics' inject()).

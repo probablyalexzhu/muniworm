@@ -28,7 +28,7 @@
     background:
       radial-gradient(112% 98% at 50% 37%, rgba(14,16,20,.32) 24%, rgba(14,16,20,.62) 56%, rgba(14,16,20,.93) 100%),
       linear-gradient(rgba(14,16,20,.5), rgba(14,16,20,.62)),
-      url("powell.jpg") center/cover no-repeat;
+      url("powell.webp") center/cover no-repeat;
     transition:filter 1.4s ease, transform 1.4s ease; }
   body.playing .bg{ filter:blur(8px) brightness(.4) saturate(.85); transform:scale(1.07); }
   body::before{ content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
@@ -195,7 +195,7 @@
   /* ---- intro: reader (left) + Clipper card (right), tightened toward center for less drag travel ---- */
   .reader{ position:absolute; top:56%; left:38%; transform:translate(-50%,-50%); z-index:6;   /* centered in the frame between the title and the hint, not on raw page-center */
     width:min(33vmin,330px); height:min(33vmin,330px); border-radius:50%;
-    background:url("clipper-reader.png") center/cover no-repeat;
+    background:url("clipper-reader.webp") center/cover no-repeat;
     box-shadow:0 10px 30px rgba(0,0,0,.5), inset 0 0 0 2px rgba(0,0,0,.18);
     transition:opacity .55s ease, box-shadow .15s ease; }
   .reader.armed{ box-shadow:0 0 0 6px rgba(167,194,67,.7), 0 10px 30px rgba(0,0,0,.5); }
