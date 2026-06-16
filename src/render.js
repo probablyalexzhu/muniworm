@@ -8,7 +8,7 @@ import { STEP, SPAN, LAG, COLOR_FRAC, NP } from './config.js';
 import { TARGETS, RANK } from './data.js';
 import { ease, mix, toPath } from './geometry.js';
 import { MORPH, BASE, DST, wormG } from './morph.js';
-import { paths, hitPaths, linesG, stationsG, legendChips } from './scene.js';
+import { paths, hitPaths, linesG, stationsG, legendChips, windNext } from './scene.js';
 import { sndLine, sndArrive } from './audio.js';
 import { armWorm, setWormFull, renderDraw, drawCues } from './draw.js';
 import { clearSelection, suppressHover } from './explorer.js';
@@ -74,6 +74,7 @@ function render(T) {
   if (T >= 1 && !(prevRenderT >= 1)) { scheduleArrive(); suppressHover(1000); }   // crossed into the map → flourish + protect the reveal from hover-dimming
   prevRenderT = T;
   document.body.classList.toggle('map-ready', T >= 1);   // only the finished map is interactive (lines selectable)
+  windNext.classList.toggle('stop', T >= 1);             // fully wound → the wind button becomes the red Muni STOP button
   if (T < 1) clearSelection();                           // stepping/folding away from the map drops any line selection
 }
 
